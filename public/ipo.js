@@ -277,7 +277,7 @@ async function openIPODetail(companyName, cardData) {
 
         setTimeout(() => {
             markStep('ipoStep4');
-            setTimeout(() => renderIPODetail(panel, detail), 400);
+            setTimeout(() => { _deepDetail = detail; renderIPODetail(panel, detail); }, 400);
         }, 400);
 
     } catch (err) {
@@ -348,6 +348,17 @@ function closeIPODetail() {
     ipoDetailOpen = false;
 }
 
+// ===== Date Formatter =====
+function formatIPODate(str) {
+    if (!str) return '—';
+    // ISO format 2026-04-17
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        const d = new Date(str + 'T00:00:00');
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return str;
+}
+
 // ===== Render IPO Detail =====
 function renderIPODetail(panel, detail) {
     const s = detail.scoring || {};
@@ -359,30 +370,52 @@ function renderIPODetail(panel, detail) {
     const news = detail.news || [];
 
     const verdictClass = s.verdict === 'INVEST' ? 'invest' : s.verdict === 'AVOID' ? 'avoid' : 'neutral';
+    const verdictGrad = s.verdict === 'INVEST'
+        ? 'linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.02))'
+        : s.verdict === 'AVOID'
+        ? 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.02))'
+        : 'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.02))';
+    const verdictBorder = s.verdict === 'INVEST' ? 'rgba(16,185,129,0.3)' : s.verdict === 'AVOID' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)';
+
+    const logoHtml = detail.logoUrl
+        ? `<img src="${detail.logoUrl}" alt="${detail.companyName}" class="ipo-hero-logo" onerror="this.style.display='none'">`
+        : `<div class="ipo-hero-logo-placeholder"><i class="fas fa-building"></i></div>`;
 
     panel.innerHTML = `
         <div class="ipo-detail-container">
-            <div class="ipo-detail-header">
-                <button class="ipo-detail-back" onclick="closeIPODetail()"><i class="fas fa-arrow-left"></i> Back to IPOs</button>
-                <div class="ipo-detail-title-row">
-                    <div>
-                        <h2>${detail.companyName}</h2>
-                        ${detail.industry ? `<span class="ipo-detail-industry"><i class="fas fa-building"></i> ${detail.industry}</span>` : ''}
+
+            <!-- Back Button -->
+            <button class="ipo-detail-back" onclick="closeIPODetail()"><i class="fas fa-arrow-left"></i> Back to IPOs</button>
+
+            <!-- Hero Header -->
+            <div class="ipo-detail-hero" style="background:${verdictGrad};border-color:${verdictBorder};">
+                <div class="ipo-hero-left">
+                    ${logoHtml}
+                    <div class="ipo-hero-info">
+                        <div class="ipo-hero-tags">
+                            ${detail.ipoType ? `<span class="ipo-hero-tag type">${detail.ipoType}</span>` : ''}
+                            ${detail.category === 'ongoing' ? `<span class="ipo-hero-tag live"><i class="fas fa-circle"></i> LIVE</span>` : ''}
+                            ${detail.industry ? `<span class="ipo-hero-tag sector">${detail.industry}</span>` : ''}
+                        </div>
+                        <h2 class="ipo-hero-name">${detail.companyName}</h2>
+                        <p class="ipo-hero-summary">${s.summary || ''}</p>
                     </div>
-                    <div class="ipo-verdict-badge ${verdictClass}">
-                        <span class="ipo-verdict-score">${s.score || '—'}</span>
-                        <span class="ipo-verdict-label">${s.verdict || 'N/A'}</span>
-                    </div>
+                </div>
+                <div class="ipo-verdict-badge ${verdictClass}">
+                    <span class="ipo-verdict-score">${s.score || '—'}</span>
+                    <span class="ipo-verdict-label">${s.verdict || 'N/A'}</span>
                 </div>
             </div>
 
-            <!-- Summary -->
-            <div class="ipo-detail-summary">
-                <p>${s.summary || 'Analysis in progress...'}</p>
+            <!-- Key Stats Grid -->
+            <div class="ipo-stats-grid">
+                ${detail.priceBand ? `<div class="ipo-stat-card"><i class="fas fa-tag"></i><span class="ipo-stat-label">Price Band</span><span class="ipo-stat-value">₹${detail.priceBand}</span></div>` : ''}
+                ${detail.openDate  ? `<div class="ipo-stat-card"><i class="fas fa-calendar-plus"></i><span class="ipo-stat-label">Opens</span><span class="ipo-stat-value">${formatIPODate(detail.openDate)}</span></div>` : ''}
+                ${detail.closeDate ? `<div class="ipo-stat-card"><i class="fas fa-calendar-check"></i><span class="ipo-stat-label">Closes</span><span class="ipo-stat-value">${formatIPODate(detail.closeDate)}</span></div>` : ''}
+                ${detail.listingDate ? `<div class="ipo-stat-card"><i class="fas fa-chart-line"></i><span class="ipo-stat-label">Listing</span><span class="ipo-stat-value">${formatIPODate(detail.listingDate)}</span></div>` : ''}
+                ${detail.lotSize ? `<div class="ipo-stat-card"><i class="fas fa-layer-group"></i><span class="ipo-stat-label">Lot Size</span><span class="ipo-stat-value">${detail.lotSize} shares</span></div>` : ''}
+                ${detail.gmp ? `<div class="ipo-stat-card highlight"><i class="fas fa-fire"></i><span class="ipo-stat-label">GMP</span><span class="ipo-stat-value">₹${detail.gmp}</span></div>` : ''}
             </div>
-
-            <!-- Quick Info Bar -->
-            ${renderQuickInfo(detail)}
 
             <!-- Score Breakdown -->
             <div class="ipo-detail-card">
@@ -398,7 +431,15 @@ function renderIPODetail(panel, detail) {
                     ${renderScoreBar('Subscription', bd.subscription, 10)}
                     ${renderScoreBar('Risk Assessment', bd.risk, 10)}
                 </div>
+                <!-- Deep Analysis CTA -->
+                <button class="ipo-deep-btn" onclick="openDeepAnalysis('${escapeAttr(detail.companyName)}', this)">
+                    <i class="fas fa-microscope"></i> Deep Analysis
+                    <span class="ipo-deep-badge">AI</span>
+                </button>
             </div>
+
+            <!-- Deep Analysis Panel (hidden by default) -->
+            <div class="ipo-deep-panel hidden" id="ipoDeepPanel"></div>
 
             <!-- Pros & Cons -->
             <div class="ipo-detail-grid">
@@ -449,11 +490,11 @@ function renderIPODetail(panel, detail) {
                     ${renderSubCategory('QIB', sub.qib)}
                     ${renderSubCategory('HNI', sub.hni)}
                     ${renderSubCategory('Retail', sub.retail)}
-                    ${renderSubCategory('Total', sub.total)}
+                    ${renderSubCategory('Total', sub.total || sub.noOfTime)}
                 </div>
             </div>` : ''}
 
-            <!-- Sentiment -->
+            <!-- News & Sentiment -->
             ${news.length > 0 ? `
             <div class="ipo-detail-card">
                 <div class="ipo-detail-card-header">
@@ -464,7 +505,7 @@ function renderIPODetail(panel, detail) {
                     <div class="ipo-sentiment-bar">
                         <div class="ipo-sentiment-positive" style="width: ${sent.total ? (sent.positive / sent.total * 100) : 33}%">${sent.positive || 0} Positive</div>
                         <div class="ipo-sentiment-neutral" style="width: ${sent.total ? (sent.neutral / sent.total * 100) : 34}%">${sent.neutral || 0} Neutral</div>
-                        <div class="ipo-sentiment-negative" style="width: ${sent.total ? (sent.negative / sent.total * 100) : 33}%">${sent.negative || 0} Negative</div>
+                        <div class="ipo-sentiment-negative" style="width: ${sent.total ? (sent.negative / sent.total * 100) : 33}%">${sent.negative || 0}</div>
                     </div>
                 </div>
                 <div class="ipo-news-list">
@@ -495,6 +536,179 @@ function renderIPODetail(panel, detail) {
                 <p>IPO analysis is based on publicly available data and AI scoring. This is NOT financial advice. Always do your own research before investing.</p>
             </div>
         </div>
+    `;
+}
+
+// ===== Deep Analysis =====
+let _deepDetail = null;
+
+function openDeepAnalysis(companyName, btn) {
+    const panel = document.getElementById('ipoDeepPanel');
+    if (!panel) return;
+
+    // Toggle
+    if (!panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        btn.innerHTML = '<i class="fas fa-microscope"></i> Deep Analysis <span class="ipo-deep-badge">AI</span>';
+        return;
+    }
+
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    btn.disabled = true;
+
+    // Use cached detail from last render
+    const detail = _deepDetail;
+    if (!detail) { btn.disabled = false; return; }
+
+    setTimeout(() => {
+        panel.classList.remove('hidden');
+        panel.innerHTML = renderDeepAnalysis(detail);
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        btn.innerHTML = '<i class="fas fa-times"></i> Close Deep Analysis';
+        btn.disabled = false;
+    }, 900);
+}
+
+function renderDeepAnalysis(detail) {
+    const s = detail.scoring || {};
+    const bd = s.breakdown || {};
+    const sub = detail.subscription;
+    const fin = detail.financials || {};
+    const val = detail.valuation || {};
+
+    // Listing gain estimate from GMP
+    const gmpVal = parseFloat((detail.gmp || '').replace(/[^\d.-]/g, '')) || 0;
+    const maxPrice = detail.priceMax || parseFloat((detail.priceBand || '').split('-').pop()) || 0;
+    const gmpPct = maxPrice > 0 && gmpVal > 0 ? ((gmpVal / maxPrice) * 100).toFixed(1) : null;
+
+    // Risk level
+    const riskScore = bd.risk || 5;
+    const riskLabel = riskScore >= 8 ? 'Low' : riskScore >= 5 ? 'Medium' : 'High';
+    const riskColor = riskScore >= 8 ? 'var(--accent-green)' : riskScore >= 5 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+
+    // Investor type recommendation
+    const score = s.score || 50;
+    const investorTypes = score >= 75
+        ? [{ type: 'Aggressive', apply: true, reason: 'Strong fundamentals + high score — suitable for higher allocation' }, { type: 'Moderate', apply: true, reason: 'Good risk-reward balance for steady investors' }, { type: 'Conservative', apply: false, reason: 'May prefer established stocks over IPOs' }]
+        : score >= 60
+        ? [{ type: 'Aggressive', apply: true, reason: 'Moderate upside potential with manageable risk' }, { type: 'Moderate', apply: true, reason: 'Apply with moderate allocation' }, { type: 'Conservative', apply: false, reason: 'Wait for post-listing stability' }]
+        : score >= 50
+        ? [{ type: 'Aggressive', apply: true, reason: 'Only for those with high risk tolerance' }, { type: 'Moderate', apply: false, reason: 'Mixed signals — better opportunities may exist' }, { type: 'Conservative', apply: false, reason: 'Avoid — risk not justified' }]
+        : [{ type: 'All Types', apply: false, reason: 'Low AI score — high risk relative to potential gain' }];
+
+    // Subscription analysis
+    const totalSub = parseFloat(sub?.total || sub?.noOfTime || 0);
+    const subAnalysis = totalSub > 10 ? 'Heavily oversubscribed — allotment will be via lottery. Listing gain potential is high.'
+        : totalSub > 3 ? 'Well subscribed — good demand signal. Fair chance of allotment.'
+        : totalSub > 1 ? 'Moderately subscribed — allotment likely, but demand is not exceptional.'
+        : totalSub > 0 ? 'Undersubscribed — below expectations. Proceed with caution.'
+        : 'Subscription data not yet available.';
+
+    // Investment checklist
+    const checks = [
+        { label: 'Company is profitable', pass: fin.patMargin > 0, note: fin.patMargin ? `PAT Margin: ${fin.patMargin}%` : 'Data unavailable' },
+        { label: 'Revenue is growing', pass: fin.revenueGrowth > 0, note: fin.revenueGrowth ? `Growth: ${fin.revenueGrowth}%` : 'Data unavailable' },
+        { label: 'Low debt levels', pass: fin.debtToEquity < 1, note: fin.debtToEquity ? `D/E: ${fin.debtToEquity}` : 'Data unavailable' },
+        { label: 'Reasonable valuation', pass: val.peRatio < 40, note: val.peRatio ? `P/E: ${val.peRatio}x` : 'Data unavailable' },
+        { label: 'GMP is positive', pass: gmpVal > 0, note: gmpVal > 0 ? `GMP: ₹${gmpVal}` : 'No GMP data' },
+        { label: 'Good market sentiment', pass: (detail.sentiment?.score || 50) >= 55, note: `Sentiment score: ${detail.sentiment?.score || 50}/100` },
+        { label: 'Subscribed above 1x', pass: totalSub >= 1, note: totalSub > 0 ? `${totalSub.toFixed(2)}x subscribed` : 'Not yet open' },
+    ];
+
+    const passCount = checks.filter(c => c.pass === true).length;
+    const totalChecks = checks.filter(c => c.pass !== undefined).length;
+
+    return `
+    <div class="ipo-deep-container">
+        <div class="ipo-deep-header">
+            <h3><i class="fas fa-microscope"></i> Deep Analysis — ${detail.companyName}</h3>
+            <span class="ipo-deep-score-pill" style="background:${score >= 75 ? 'rgba(16,185,129,0.15)' : score >= 50 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}; color:${score >= 75 ? 'var(--accent-green)' : score >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)'}">
+                ${score}/100 · ${s.verdict}
+            </span>
+        </div>
+
+        <!-- Investment Checklist -->
+        <div class="ipo-deep-section">
+            <div class="ipo-deep-section-title"><i class="fas fa-clipboard-check"></i> Investment Checklist <span class="ipo-deep-check-count">${passCount}/${totalChecks} passed</span></div>
+            <div class="ipo-deep-checklist">
+                ${checks.map(c => `
+                    <div class="ipo-deep-check-item ${c.pass === true ? 'pass' : c.pass === false ? 'fail' : 'unknown'}">
+                        <i class="fas ${c.pass === true ? 'fa-check-circle' : c.pass === false ? 'fa-times-circle' : 'fa-question-circle'}"></i>
+                        <div class="ipo-deep-check-info">
+                            <span class="ipo-deep-check-label">${c.label}</span>
+                            <span class="ipo-deep-check-note">${c.note}</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Listing Gain Estimate -->
+        ${gmpPct ? `
+        <div class="ipo-deep-section">
+            <div class="ipo-deep-section-title"><i class="fas fa-rocket"></i> Listing Gain Estimate</div>
+            <div class="ipo-deep-gain-card">
+                <div class="ipo-deep-gain-main">
+                    <span class="ipo-deep-gain-pct ${gmpVal > 0 ? 'up' : 'down'}">+${gmpPct}%</span>
+                    <span class="ipo-deep-gain-label">Expected listing gain based on GMP ₹${gmpVal}</span>
+                </div>
+                <p class="ipo-deep-gain-note">Grey Market Premium reflects unofficial demand before listing. It's speculative and may differ from actual listing. Strong GMP (>10%) usually signals positive market sentiment.</p>
+            </div>
+        </div>` : ''}
+
+        <!-- Subscription Insights -->
+        ${totalSub > 0 ? `
+        <div class="ipo-deep-section">
+            <div class="ipo-deep-section-title"><i class="fas fa-users"></i> Subscription Analysis</div>
+            <div class="ipo-deep-sub-insight">
+                <div class="ipo-deep-sub-meter">
+                    <div class="ipo-deep-sub-fill" style="width:${Math.min(100, totalSub * 5)}%; background:${totalSub > 10 ? 'var(--accent-green)' : totalSub > 3 ? 'var(--accent-yellow)' : 'var(--accent-red)'}"></div>
+                </div>
+                <span class="ipo-deep-sub-times">${totalSub.toFixed(2)}x subscribed</span>
+                <p class="ipo-deep-sub-text">${subAnalysis}</p>
+            </div>
+        </div>` : ''}
+
+        <!-- Investor Type Suitability -->
+        <div class="ipo-deep-section">
+            <div class="ipo-deep-section-title"><i class="fas fa-user-tie"></i> Suitable For</div>
+            <div class="ipo-deep-investor-types">
+                ${investorTypes.map(t => `
+                    <div class="ipo-deep-investor-card ${t.apply ? 'apply' : 'skip'}">
+                        <div class="ipo-deep-investor-header">
+                            <span class="ipo-deep-investor-type">${t.type}</span>
+                            <span class="ipo-deep-investor-verdict ${t.apply ? 'apply' : 'skip'}">${t.apply ? 'Apply' : 'Skip'}</span>
+                        </div>
+                        <p class="ipo-deep-investor-reason">${t.reason}</p>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Risk Analysis -->
+        <div class="ipo-deep-section">
+            <div class="ipo-deep-section-title"><i class="fas fa-shield-alt"></i> Risk Assessment</div>
+            <div class="ipo-deep-risk-card">
+                <div class="ipo-deep-risk-level" style="color:${riskColor}">
+                    <span class="ipo-deep-risk-label">Risk Level</span>
+                    <span class="ipo-deep-risk-value">${riskLabel}</span>
+                </div>
+                <ul class="ipo-deep-risk-list">
+                    ${score < 50 ? '<li><i class="fas fa-exclamation-triangle"></i> AI score below 50 — more risks than opportunities identified</li>' : ''}
+                    ${!fin.patMargin || fin.patMargin < 0 ? '<li><i class="fas fa-exclamation-triangle"></i> No confirmed profitability data</li>' : ''}
+                    ${gmpVal <= 0 && detail.gmp ? '<li><i class="fas fa-exclamation-triangle"></i> Negative or zero GMP suggests subdued listing expectations</li>' : ''}
+                    ${totalSub > 0 && totalSub < 1 ? '<li><i class="fas fa-exclamation-triangle"></i> Undersubscription increases listing loss risk</li>' : ''}
+                    <li><i class="fas fa-info-circle" style="color:var(--accent-blue)"></i> Market conditions on listing day heavily influence actual gains</li>
+                    <li><i class="fas fa-info-circle" style="color:var(--accent-blue)"></i> Always invest only what you can afford to lose in IPOs</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="ipo-deep-disclaimer">
+            <i class="fas fa-robot"></i>
+            <span>This deep analysis is generated by AI using publicly available data. It is <strong>not financial advice</strong>. Past IPO performance does not guarantee future results.</span>
+        </div>
+    </div>
     `;
 }
 
