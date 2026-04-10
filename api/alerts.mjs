@@ -3,6 +3,17 @@ import { ObjectId } from 'mongodb';
 import { getDb } from '../lib/mongodb.mjs';
 import { verifyToken } from '../lib/firebase-admin.mjs';
 
+function sanitizeSymbol(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    const s = raw.trim().toUpperCase().slice(0, 20);
+    return /^[A-Z0-9.\-^]+$/.test(s) ? s : null;
+}
+
+function sanitizeName(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    return raw.trim().replace(/[<>"']/g, '').slice(0, 100) || null;
+}
+
 export default async function alertsHandler(req, res) {
     const { action } = req.query;
 
@@ -25,14 +36,18 @@ export default async function alertsHandler(req, res) {
 }
 
 async function handleCreate(db, user, req, res) {
-    const { symbol, name, targetPrice, condition, currency } = req.body;
+    const { targetPrice, condition, currency } = req.body;
+    const symbol = sanitizeSymbol(req.body.symbol);
+    const name = sanitizeName(req.body.name) || symbol;
     if (!symbol || !targetPrice || !condition) return res.status(400).json({ error: 'Missing required fields: symbol, targetPrice, condition' });
     if (!['above', 'below'].includes(condition)) return res.status(400).json({ error: 'Condition must be "above" or "below"' });
+    const price = parseFloat(targetPrice);
+    if (isNaN(price) || price <= 0) return res.status(400).json({ error: 'targetPrice must be a positive number' });
     const activeCount = await db.collection('alerts').countDocuments({ uid: user.uid, status: 'active' });
     if (activeCount >= 10) return res.status(400).json({ error: 'Maximum of 10 active alerts reached.' });
     const alert = {
-        uid: user.uid, email: user.email, symbol: symbol.toUpperCase(), name: name || symbol,
-        targetPrice: parseFloat(targetPrice), condition, currency: currency || 'USD',
+        uid: user.uid, email: user.email, symbol, name,
+        targetPrice: price, condition, currency: currency || 'USD',
         status: 'active', createdAt: new Date(), updatedAt: new Date(),
         lastCheckedAt: null, lastCheckedPrice: null,
     };

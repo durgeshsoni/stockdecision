@@ -2,6 +2,17 @@
 import { getDb } from '../lib/mongodb.mjs';
 import { verifyToken } from '../lib/firebase-admin.mjs';
 
+function sanitizeSymbol(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    const s = raw.trim().toUpperCase().slice(0, 20);
+    return /^[A-Z0-9.\-^]+$/.test(s) ? s : null;
+}
+
+function sanitizeName(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    return raw.trim().replace(/[<>"']/g, '').slice(0, 100) || null;
+}
+
 export default async function userHandler(req, res) {
     const { action } = req.query;
 
@@ -27,9 +38,10 @@ export default async function userHandler(req, res) {
 }
 
 async function handleSearch(db, user, req, res) {
-    const { symbol, name } = req.body;
-    if (!symbol) return res.status(400).json({ error: 'Missing required field: symbol' });
-    await db.collection('search_history').insertOne({ uid: user.uid, symbol: symbol.toUpperCase(), name: name || symbol, searchedAt: new Date() });
+    const symbol = sanitizeSymbol(req.body.symbol);
+    const name = sanitizeName(req.body.name) || symbol;
+    if (!symbol) return res.status(400).json({ error: 'Missing or invalid field: symbol' });
+    await db.collection('search_history').insertOne({ uid: user.uid, symbol, name, searchedAt: new Date() });
     return res.json({ success: true });
 }
 
@@ -55,22 +67,22 @@ async function handleWatchlist(db, user, res) {
 }
 
 async function handleWatchlistAdd(db, user, req, res) {
-    const { symbol, name } = req.body;
-    if (!symbol) return res.status(400).json({ error: 'Missing required field: symbol' });
-    const upperSymbol = symbol.toUpperCase();
+    const symbol = sanitizeSymbol(req.body.symbol);
+    const name = sanitizeName(req.body.name) || symbol;
+    if (!symbol) return res.status(400).json({ error: 'Missing or invalid field: symbol' });
     const count = await db.collection('watchlist').countDocuments({ uid: user.uid });
     if (count >= 30) return res.status(400).json({ error: 'Maximum of 30 watchlist items reached.' });
-    const existing = await db.collection('watchlist').findOne({ uid: user.uid, symbol: upperSymbol });
+    const existing = await db.collection('watchlist').findOne({ uid: user.uid, symbol });
     if (existing) return res.status(400).json({ error: 'Stock already in watchlist' });
-    const item = { uid: user.uid, symbol: upperSymbol, name: name || symbol, addedAt: new Date() };
+    const item = { uid: user.uid, symbol, name, addedAt: new Date() };
     await db.collection('watchlist').insertOne(item);
     return res.json({ success: true, item });
 }
 
 async function handleWatchlistRemove(db, user, req, res) {
-    const { symbol } = req.body;
-    if (!symbol) return res.status(400).json({ error: 'Missing required field: symbol' });
-    const result = await db.collection('watchlist').deleteOne({ uid: user.uid, symbol: symbol.toUpperCase() });
+    const symbol = sanitizeSymbol(req.body.symbol);
+    if (!symbol) return res.status(400).json({ error: 'Missing or invalid field: symbol' });
+    const result = await db.collection('watchlist').deleteOne({ uid: user.uid, symbol });
     if (result.deletedCount === 0) return res.status(404).json({ error: 'Stock not found in watchlist' });
     return res.json({ success: true });
 }

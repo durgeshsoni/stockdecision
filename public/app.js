@@ -8,77 +8,38 @@ let beginnerChart = null;
 let currentMode = 'beginner'; // 'beginner' or 'pro'
 let lastAnalysis = null; // Store last analysis for mode switching
 
-// ===== Indian Stock Database (NSE/BSE) =====
-const STOCK_DB = [
-    // Nifty 50 / Popular Indian
-    { symbol: 'RELIANCE.NS', name: 'Reliance Industries', exchange: 'NSE', sector: 'Energy' },
-    { symbol: 'TCS.NS', name: 'Tata Consultancy Services', exchange: 'NSE', sector: 'IT' },
-    { symbol: 'HDFCBANK.NS', name: 'HDFC Bank Ltd', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'INFY.NS', name: 'Infosys Ltd', exchange: 'NSE', sector: 'IT' },
-    { symbol: 'ICICIBANK.NS', name: 'ICICI Bank Ltd', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'HINDUNILVR.NS', name: 'Hindustan Unilever', exchange: 'NSE', sector: 'FMCG' },
-    { symbol: 'SBIN.NS', name: 'State Bank of India', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel Ltd', exchange: 'NSE', sector: 'Telecom' },
-    { symbol: 'ITC.NS', name: 'ITC Ltd', exchange: 'NSE', sector: 'FMCG' },
-    { symbol: 'KOTAKBANK.NS', name: 'Kotak Mahindra Bank', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'LT.NS', name: 'Larsen & Toubro', exchange: 'NSE', sector: 'Infrastructure' },
-    { symbol: 'AXISBANK.NS', name: 'Axis Bank Ltd', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'WIPRO.NS', name: 'Wipro Ltd', exchange: 'NSE', sector: 'IT' },
-    { symbol: 'ASIANPAINT.NS', name: 'Asian Paints Ltd', exchange: 'NSE', sector: 'Paints' },
-    { symbol: 'MARUTI.NS', name: 'Maruti Suzuki India', exchange: 'NSE', sector: 'Auto' },
-    { symbol: 'TATAMOTORS.NS', name: 'Tata Motors Ltd', exchange: 'NSE', sector: 'Auto' },
-    { symbol: 'SUNPHARMA.NS', name: 'Sun Pharmaceutical', exchange: 'NSE', sector: 'Pharma' },
-    { symbol: 'TITAN.NS', name: 'Titan Company Ltd', exchange: 'NSE', sector: 'Consumer' },
-    { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance Ltd', exchange: 'NSE', sector: 'Finance' },
-    { symbol: 'HCLTECH.NS', name: 'HCL Technologies', exchange: 'NSE', sector: 'IT' },
-    { symbol: 'ADANIENT.NS', name: 'Adani Enterprises', exchange: 'NSE', sector: 'Conglomerate' },
-    { symbol: 'ADANIPORTS.NS', name: 'Adani Ports', exchange: 'NSE', sector: 'Infrastructure' },
-    { symbol: 'TATASTEEL.NS', name: 'Tata Steel Ltd', exchange: 'NSE', sector: 'Metals' },
-    { symbol: 'POWERGRID.NS', name: 'Power Grid Corp', exchange: 'NSE', sector: 'Power' },
-    { symbol: 'NTPC.NS', name: 'NTPC Ltd', exchange: 'NSE', sector: 'Power' },
-    { symbol: 'ONGC.NS', name: 'ONGC Ltd', exchange: 'NSE', sector: 'Oil & Gas' },
-    { symbol: 'JSWSTEEL.NS', name: 'JSW Steel Ltd', exchange: 'NSE', sector: 'Metals' },
-    { symbol: 'TECHM.NS', name: 'Tech Mahindra', exchange: 'NSE', sector: 'IT' },
-    { symbol: 'ULTRACEMCO.NS', name: 'UltraTech Cement', exchange: 'NSE', sector: 'Cement' },
-    { symbol: 'DRREDDY.NS', name: "Dr. Reddy's Labs", exchange: 'NSE', sector: 'Pharma' },
-    { symbol: 'CIPLA.NS', name: 'Cipla Ltd', exchange: 'NSE', sector: 'Pharma' },
-    { symbol: 'DIVISLAB.NS', name: "Divi's Laboratories", exchange: 'NSE', sector: 'Pharma' },
-    { symbol: 'HEROMOTOCO.NS', name: 'Hero MotoCorp', exchange: 'NSE', sector: 'Auto' },
-    { symbol: 'BAJAJ-AUTO.NS', name: 'Bajaj Auto Ltd', exchange: 'NSE', sector: 'Auto' },
-    { symbol: 'EICHERMOT.NS', name: 'Eicher Motors', exchange: 'NSE', sector: 'Auto' },
-    { symbol: 'COALINDIA.NS', name: 'Coal India Ltd', exchange: 'NSE', sector: 'Mining' },
-    { symbol: 'BPCL.NS', name: 'BPCL Ltd', exchange: 'NSE', sector: 'Oil & Gas' },
-    { symbol: 'GRASIM.NS', name: 'Grasim Industries', exchange: 'NSE', sector: 'Cement' },
-    { symbol: 'INDUSINDBK.NS', name: 'IndusInd Bank', exchange: 'NSE', sector: 'Banking' },
-    { symbol: 'NESTLEIND.NS', name: 'Nestle India', exchange: 'NSE', sector: 'FMCG' },
-    { symbol: 'TATACONSUM.NS', name: 'Tata Consumer', exchange: 'NSE', sector: 'FMCG' },
-    { symbol: 'BRITANNIA.NS', name: 'Britannia Industries', exchange: 'NSE', sector: 'FMCG' },
-    { symbol: 'VEDL.NS', name: 'Vedanta Ltd', exchange: 'NSE', sector: 'Metals' },
-    { symbol: 'ZOMATO.NS', name: 'Zomato Ltd', exchange: 'NSE', sector: 'Tech' },
-    { symbol: 'PAYTM.NS', name: 'Paytm (One97)', exchange: 'NSE', sector: 'Fintech' },
-    { symbol: 'IRCTC.NS', name: 'IRCTC Ltd', exchange: 'NSE', sector: 'Travel' },
-    { symbol: 'HAL.NS', name: 'Hindustan Aeronautics', exchange: 'NSE', sector: 'Defence' },
-    { symbol: 'BEL.NS', name: 'Bharat Electronics', exchange: 'NSE', sector: 'Defence' },
-    { symbol: 'JIOFIN.NS', name: 'Jio Financial', exchange: 'NSE', sector: 'Finance' },
-    // US Major (for comparison)
-    { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Tech' },
-    { symbol: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ', sector: 'Tech' },
-    { symbol: 'GOOGL', name: 'Alphabet (Google)', exchange: 'NASDAQ', sector: 'Tech' },
-    { symbol: 'TSLA', name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Auto' },
-    { symbol: 'NVDA', name: 'NVIDIA Corp', exchange: 'NASDAQ', sector: 'Semiconductors' },
-    { symbol: 'AMZN', name: 'Amazon.com', exchange: 'NASDAQ', sector: 'E-Commerce' },
-    { symbol: 'META', name: 'Meta Platforms', exchange: 'NASDAQ', sector: 'Tech' },
-];
-
-// Indian stock name -> symbol mapping (auto-append .NS)
+// ===== Indian Stock Database (loaded from stocks.json) =====
+// To add/remove stocks, edit public/stocks.json — no code change needed.
+let STOCK_DB = [];
 const INDIAN_NAMES = {};
-STOCK_DB.filter(s => s.symbol.endsWith('.NS')).forEach(s => {
-    INDIAN_NAMES[s.symbol.replace('.NS', '')] = s.symbol;
-    INDIAN_NAMES[s.name.toUpperCase()] = s.symbol;
-});
+
+async function loadStockDb() {
+    try {
+        const res = await fetch('/stocks.json');
+        if (!res.ok) throw new Error('Failed to load stocks.json');
+        STOCK_DB = await res.json();
+    } catch {
+        // Minimal fallback — keeps search working even if JSON fetch fails
+        STOCK_DB = [
+            { symbol: 'RELIANCE.NS', name: 'Reliance Industries', exchange: 'NSE', sector: 'Energy' },
+            { symbol: 'TCS.NS',      name: 'Tata Consultancy Services', exchange: 'NSE', sector: 'IT' },
+            { symbol: 'HDFCBANK.NS', name: 'HDFC Bank Ltd', exchange: 'NSE', sector: 'Banking' },
+            { symbol: 'INFY.NS',     name: 'Infosys Ltd', exchange: 'NSE', sector: 'IT' },
+            { symbol: 'AAPL',        name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Tech' },
+            { symbol: 'MSFT',        name: 'Microsoft', exchange: 'NASDAQ', sector: 'Tech' },
+        ];
+    }
+    STOCK_DB.filter(s => s.symbol.endsWith('.NS')).forEach(s => {
+        INDIAN_NAMES[s.symbol.replace('.NS', '')] = s.symbol;
+        INDIAN_NAMES[s.name.toUpperCase()] = s.symbol;
+    });
+}
 
 // ===== Initialization =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load stock database before wiring up search (non-blocking for the rest of init)
+    loadStockDb(); // intentionally not awaited — search works once promise resolves
+
     document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
     document.getElementById('stockInput').addEventListener('keypress', e => {
         if (e.key === 'Enter') { e.preventDefault(); startAnalysis(); }
@@ -243,7 +204,7 @@ function bindDropdownClicks(dropdown) {
 }
 
 // ===== API Calls =====
-async function apiGet(endpoint, params) {
+async function apiGet(endpoint, params, retries = 2) {
     const typeMap = { chart: 'chart', fundamentals: 'fundamentals', insights: 'insights', news: 'news' };
     const qs = new URLSearchParams({ type: typeMap[endpoint] || endpoint, ...params }).toString();
     const headers = {};
@@ -251,10 +212,24 @@ async function apiGet(endpoint, params) {
         const token = await getAuthToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
     }
-    const res = await fetch(`/api/yahoo?${qs}`, { headers });
-    if (res.status === 429) throw new Error('Yahoo rate limit. Wait 1-2 min.');
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const res = await fetch(`/api/yahoo?${qs}`, { headers });
+            if (res.status === 429) throw new Error('Yahoo rate limit. Wait 1-2 min.');
+            // Don't retry client errors (4xx) — only server errors (5xx) and network failures
+            if (res.status >= 400 && res.status < 500) throw new Error(`API error: ${res.status}`);
+            if (!res.ok) {
+                if (attempt < retries) { await new Promise(r => setTimeout(r, 800 * Math.pow(2, attempt))); continue; }
+                throw new Error(`API error: ${res.status}`);
+            }
+            return res.json();
+        } catch (e) {
+            // Re-throw immediately for non-retryable errors
+            if (e.message.includes('rate limit') || e.message.includes('API error: 4')) throw e;
+            if (attempt === retries) throw e;
+            await new Promise(r => setTimeout(r, 800 * Math.pow(2, attempt)));
+        }
+    }
 }
 
 // Track search if logged in (fire-and-forget)
