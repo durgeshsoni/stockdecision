@@ -159,7 +159,7 @@ function onAuthChange(callback) {
 async function syncUserToBackend(user) {
     try {
         const token = await user.getIdToken();
-        await fetch('/.netlify/functions/auth?action=login', {
+        await fetch('/api/auth?action=login', {
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer ' + token,

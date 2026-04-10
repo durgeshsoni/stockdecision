@@ -242,18 +242,16 @@ function bindDropdownClicks(dropdown) {
     });
 }
 
-// ===== API Calls (Netlify functions + local fallback + auth) =====
+// ===== API Calls =====
 async function apiGet(endpoint, params) {
     const typeMap = { chart: 'chart', fundamentals: 'fundamentals', insights: 'insights', news: 'news' };
     const qs = new URLSearchParams({ type: typeMap[endpoint] || endpoint, ...params }).toString();
-    // Add auth header if logged in
     const headers = {};
     if (typeof getAuthToken === 'function') {
         const token = await getAuthToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
     }
-    let res = await fetch(`/.netlify/functions/yahoo?${qs}`, { headers });
-    if (res.status === 404) { const lqs = new URLSearchParams(params).toString(); res = await fetch(`/api/${endpoint}?${lqs}`, { headers }); }
+    const res = await fetch(`/api/yahoo?${qs}`, { headers });
     if (res.status === 429) throw new Error('Yahoo rate limit. Wait 1-2 min.');
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
@@ -264,7 +262,7 @@ function trackSearch(symbol, name) {
     if (typeof getAuthToken !== 'function') return;
     getAuthToken().then(token => {
         if (!token) return;
-        fetch('/.netlify/functions/user?action=search', {
+        fetch('/api/user?action=search', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ symbol, name })

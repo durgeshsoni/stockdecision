@@ -5,7 +5,7 @@
 async function authApiCall(func, action, body = null) {
     const token = await getAuthToken();
     if (!token) { showLoginModal(); throw new Error('Login required'); }
-    const url = `/.netlify/functions/${func}?action=${action}`;
+    const url = `/api/${func}?action=${action}`;
     const opts = {
         headers: {
             'Authorization': `Bearer ${token}`,

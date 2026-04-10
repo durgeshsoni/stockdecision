@@ -8,24 +8,14 @@ let ipoDetailOpen = false;
 // ===== API =====
 async function ipoApiGet(type, params = {}) {
     const qs = new URLSearchParams({ type, ...params }).toString();
-    // Use same pattern as apiGet — works with both local server & Netlify
-    const base = window.location.hostname === 'localhost' ? '' : '';
-    const resp = await fetch(`/.netlify/functions/ipo?${qs}`);
+    const resp = await fetch(`/api/ipo?${qs}`);
     if (!resp.ok) throw new Error(`IPO API error: ${resp.status}`);
     return resp.json();
 }
 
-// Local fallback for dev server
+// Alias used throughout the file
 async function ipoApiGetLocal(type, params = {}) {
-    try {
-        return await ipoApiGet(type, params);
-    } catch (e) {
-        // If Netlify function not available (local dev), try proxy
-        const qs = new URLSearchParams({ type, ...params }).toString();
-        const resp = await fetch(`/api/ipo?${qs}`);
-        if (!resp.ok) throw new Error('IPO local API error');
-        return resp.json();
-    }
+    return ipoApiGet(type, params);
 }
 
 // ===== Show IPO Section =====
