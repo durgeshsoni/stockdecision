@@ -1,0 +1,37 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/lib/**"]
+
+# Scheduled function: check stock alerts every 15 minutes
+[functions."check-alerts"]
+  schedule = "*/15 * * * *"
+
+# Yahoo Finance API proxy
+[[redirects]]
+  from = "/api/chart"
+  to = "/.netlify/functions/yahoo?type=chart"
+  status = 200
+  query = { symbol = ":symbol", range = ":range", interval = ":interval" }
+
+[[redirects]]
+  from = "/api/fundamentals"
+  to = "/.netlify/functions/yahoo?type=fundamentals"
+  status = 200
+  query = { symbol = ":symbol" }
+
+[[redirects]]
+  from = "/api/insights"
+  to = "/.netlify/functions/yahoo?type=insights"
+  status = 200
+  query = { symbol = ":symbol" }
+
+# IPO Analyzer API
+[[redirects]]
+  from = "/api/ipo"
+  to = "/.netlify/functions/ipo"
+  status = 200
+  force = true

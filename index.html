@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Stock Analyzer Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>AI Stock Analyzer <small>Pro</small></span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="stockInput" placeholder="Enter stock (e.g., AAPL, RELIANCE, TCS, INFY)" autocomplete="off" />
+                    <button id="analyzeBtn" class="btn-analyze">
+                        <i class="fas fa-bolt"></i> Analyze
+                    </button>
+                </div>
+                <!-- Suggestions dropdown -->
+                <div class="suggestions-dropdown hidden" id="suggestionsDropdown"></div>
+            </div>
+            <div class="header-right">
+                <div class="mode-toggle" id="modeToggle">
+                    <button class="mode-btn active" data-mode="beginner" id="btnBeginner">
+                        <i class="fas fa-seedling"></i> Beginner
+                    </button>
+                    <button class="mode-btn" data-mode="pro" id="btnPro">
+                        <i class="fas fa-microscope"></i> Pro
+                    </button>
+                </div>
+                <div class="market-status" id="marketStatus">
+                    <span class="status-dot"></span>
+                    <span id="marketStatusText">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden">
+            <div class="loader-container">
+                <div class="loader-ring"></div>
+                <div class="loader-text">
+                    <p id="loadingStep">Fetching stock data...</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- World Market Ticker -->
+        <div class="ticker-bar">
+            <div class="ticker-content" id="tickerContent">
+                <span class="ticker-loading">Loading world markets...</span>
+            </div>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="welcome-screen">
+            <div class="welcome-content">
+                <div class="welcome-icon"><i class="fas fa-chart-line"></i></div>
+                <h1>AI Stock Analyzer Pro</h1>
+                <p>Get comprehensive AI-powered stock analysis with technical indicators, fundamental data, dividend info, and investment recommendations.</p>
+                <div class="quick-picks">
+                    <h3><i class="fas fa-fire" style="color:var(--accent-yellow)"></i> Popular Indian Stocks:</h3>
+                    <div class="pick-grid">
+                        <button class="pick-btn indian" data-symbol="RELIANCE.NS">RELIANCE<span>Reliance Ind.</span></button>
+                        <button class="pick-btn indian" data-symbol="TCS.NS">TCS<span>TCS Ltd</span></button>
+                        <button class="pick-btn indian" data-symbol="HDFCBANK.NS">HDFC Bank<span>HDFC Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="INFY.NS">INFY<span>Infosys</span></button>
+                        <button class="pick-btn indian" data-symbol="ICICIBANK.NS">ICICI Bank<span>ICICI Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="SBIN.NS">SBI<span>State Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="BHARTIARTL.NS">Airtel<span>Bharti Airtel</span></button>
+                        <button class="pick-btn indian" data-symbol="ITC.NS">ITC<span>ITC Ltd</span></button>
+                        <button class="pick-btn indian" data-symbol="TATAMOTORS.NS">Tata Motors<span>Tata Motors</span></button>
+                        <button class="pick-btn indian" data-symbol="BAJFINANCE.NS">Bajaj Fin<span>Bajaj Finance</span></button>
+                    </div>
+                    <h3 style="margin-top:16px"><i class="fas fa-globe" style="color:var(--accent-blue)"></i> US Stocks:</h3>
+                    <div class="pick-grid">
+                        <button class="pick-btn" data-symbol="AAPL">AAPL<span>Apple</span></button>
+                        <button class="pick-btn" data-symbol="MSFT">MSFT<span>Microsoft</span></button>
+                        <button class="pick-btn" data-symbol="GOOGL">GOOGL<span>Google</span></button>
+                        <button class="pick-btn" data-symbol="TSLA">TSLA<span>Tesla</span></button>
+                        <button class="pick-btn" data-symbol="NVDA">NVDA<span>NVIDIA</span></button>
+                    </div>
+                </div>
+                <div class="welcome-note">
+                    <i class="fas fa-info-circle"></i>
+                    <span>No API key needed! Just type any Indian stock name (e.g. RELIANCE, TCS, HDFC) - auto-detects NSE.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Beginner Mode Content -->
+        <main id="beginnerContent" class="hidden">
+            <div class="beginner-container">
+                <!-- Big Verdict Card -->
+                <div class="b-verdict-card" id="bVerdictCard">
+                    <div class="b-verdict-emoji" id="bEmoji"></div>
+                    <h1 class="b-stock-name" id="bStockName">--</h1>
+                    <div class="b-price" id="bPrice">--</div>
+                    <div class="b-verdict-label" id="bVerdictLabel">--</div>
+                    <div class="b-verdict-desc" id="bVerdictDesc">--</div>
+                </div>
+
+                <!-- Simple Action Cards -->
+                <div class="b-cards-grid">
+                    <div class="b-card" id="bShouldBuy">
+                        <div class="b-card-icon"><i class="fas fa-shopping-cart"></i></div>
+                        <h3>Should I Buy?</h3>
+                        <p id="bBuyAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bHowLong">
+                        <div class="b-card-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <h3>How Long to Hold?</h3>
+                        <p id="bHoldAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bHowMuch">
+                        <div class="b-card-icon"><i class="fas fa-wallet"></i></div>
+                        <h3>How Much to Invest?</h3>
+                        <p id="bInvestAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bDividend">
+                        <div class="b-card-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                        <h3>Will I Get Dividends?</h3>
+                        <p id="bDivAnswer">--</p>
+                    </div>
+                </div>
+
+                <!-- Health Meter -->
+                <div class="b-health-section">
+                    <h2><i class="fas fa-heartbeat"></i> Company Health Check</h2>
+                    <div class="b-health-grid" id="bHealthGrid"></div>
+                </div>
+
+                <!-- Simple Chart -->
+                <div class="b-chart-section">
+                    <h2><i class="fas fa-chart-line"></i> Price History (1 Year)</h2>
+                    <canvas id="bPriceChart"></canvas>
+                </div>
+
+                <!-- About the Company -->
+                <div class="b-about-section" id="bAbout">
+                    <h2><i class="fas fa-building"></i> About the Company</h2>
+                    <p id="bAboutText">--</p>
+                </div>
+
+                <!-- News & Events -->
+                <div class="b-news-section" id="bNewsSection">
+                    <h2><i class="fas fa-newspaper"></i> Latest News & Events</h2>
+                    <div class="b-news-verdict" id="bNewsVerdict"></div>
+                    <div class="b-news-grid" id="bNewsGrid"></div>
+                </div>
+
+                <!-- Simple Summary -->
+                <div class="b-summary-section" id="bSummary">
+                    <h2><i class="fas fa-lightbulb"></i> What Does This All Mean?</h2>
+                    <div class="b-summary-text" id="bSummaryText">--</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Pro Mode Content -->
+        <main id="mainContent" class="hidden">
+            <!-- Top Summary Cards -->
+            <div class="summary-row">
+                <div class="summary-card verdict-card" id="verdictCard">
+                    <div class="verdict-badge" id="verdictBadge">ANALYZING</div>
+                    <h1 id="stockName">--</h1>
+                    <div class="price-display">
+                        <span class="current-price" id="currentPrice">--</span>
+                        <span class="price-change" id="priceChange">--</span>
+                    </div>
+                    <div class="verdict-text" id="verdictText">Enter a stock symbol to begin analysis</div>
+                </div>
+
+                <div class="summary-card">
+                    <h3><i class="fas fa-signal"></i> Signal Strength</h3>
+                    <div class="signal-meter">
+                        <div class="meter-bar">
+                            <div class="meter-fill" id="signalFill"></div>
+                        </div>
+                        <div class="meter-labels">
+                            <span>Strong Sell</span>
+                            <span>Neutral</span>
+                            <span>Strong Buy</span>
+                        </div>
+                    </div>
+                    <div class="signal-details" id="signalDetails">--</div>
+                </div>
+
+                <div class="summary-card">
+                    <h3><i class="fas fa-hand-holding-usd"></i> Investment Suggestion</h3>
+                    <div class="invest-suggestion" id="investSuggestion">
+                        <div class="invest-amount">--</div>
+                        <div class="invest-details">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3><i class="fas fa-chart-area"></i> Price Chart & Moving Averages</h3>
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fas fa-chart-bar"></i> Volume Analysis</h3>
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Analysis Grid -->
+            <div class="analysis-grid">
+                <div class="analysis-card">
+                    <h3><i class="fas fa-chart-pie"></i> Technical Analysis</h3>
+                    <div class="analysis-content" id="technicalAnalysis">
+                        <div class="indicator-grid" id="indicatorGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-balance-scale"></i> Fundamental Analysis</h3>
+                    <div class="analysis-content" id="fundamentalAnalysis">
+                        <div class="fundamental-grid" id="fundamentalGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-building"></i> Company Profile</h3>
+                    <div class="analysis-content" id="companyProfile">
+                        <p class="placeholder-text">Search a stock to view company details</p>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-coins"></i> Dividend & Returns</h3>
+                    <div class="analysis-content" id="dividendInfo">
+                        <p class="placeholder-text">Search a stock to view dividend info</p>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-globe"></i> World Market Overview</h3>
+                    <div class="analysis-content" id="worldMarket">
+                        <div class="market-grid" id="marketGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-clock"></i> Holding Period Recommendation</h3>
+                    <div class="analysis-content" id="holdDuration">
+                        <p class="placeholder-text">Search a stock to view holding recommendation</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News & Sentiment Analysis -->
+            <div class="news-card">
+                <h3><i class="fas fa-newspaper"></i> News & Events Sentiment</h3>
+                <div class="news-sentiment-bar" id="newsSentimentBar"></div>
+                <div class="news-grid-pro" id="newsGridPro"></div>
+            </div>
+
+            <!-- AI Detailed Report -->
+            <div class="report-card">
+                <h3><i class="fas fa-robot"></i> AI Analysis Report</h3>
+                <div class="report-content" id="aiReport">
+                    <p class="placeholder-text">Enter a stock symbol above to generate a comprehensive AI analysis report</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p><i class="fas fa-exclamation-triangle"></i> Disclaimer: This tool provides analysis based on publicly available data. It is NOT financial advice. Always consult a certified financial advisor before making investment decisions.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockDecision - Smart Stock Analysis</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <div class="header-left">
+                <div class="logo" onclick="goHome()" style="cursor:pointer">
+                    <i class="fas fa-chart-line"></i>
+                    <span>StockDecision</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="stockInput" placeholder="Search any stock... (e.g. RELIANCE, TCS, INFY)" autocomplete="off" />
+                    <button id="analyzeBtn" class="btn-analyze">
+                        <i class="fas fa-bolt"></i> Analyze
+                    </button>
+                </div>
+                <div class="suggestions-dropdown hidden" id="suggestionsDropdown"></div>
+            </div>
+            <div class="header-right">
+                <button class="btn-ai-chat" id="chatFab"><i class="fas fa-wand-magic-sparkles"></i> <span class="ai-chat-label">Analyze with AI</span></button>
+                <button class="btn-screener" onclick="showScreener()" title="Stock Screener"><i class="fas fa-filter"></i> <span class="screener-label">Screener</span></button>
+                <button class="btn-ipo" onclick="showIPOSection()" title="IPO Analyzer"><i class="fas fa-rocket"></i> <span class="ipo-label">IPO</span></button>
+                <div class="market-status" id="marketStatus">
+                    <span class="status-dot"></span>
+                    <span id="marketStatusText">Loading...</span>
+                </div>
+                <div class="auth-area" id="authArea">
+                    <button class="btn-login" id="loginBtn" onclick="showLoginModal()"><i class="fas fa-user-circle"></i> <span class="login-label">Login</span></button>
+                    <div class="user-menu hidden" id="userMenu">
+                        <img id="userAvatar" class="user-avatar" src="" alt="">
+                        <span id="userName" class="user-name"></span>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a onclick="showDashboard()"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                            <a onclick="showAlerts()"><i class="fas fa-bell"></i> My Alerts</a>
+                            <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden">
+            <div class="loader-container">
+                <div class="loader-ring"></div>
+                <div class="loader-text">
+                    <p id="loadingStep">Fetching stock data...</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal hidden">
+            <div class="modal-content login-modal">
+                <button class="modal-close-btn" onclick="closeLoginModal()">&times;</button>
+                <div class="login-header">
+                    <i class="fas fa-chart-line" style="font-size:32px;color:var(--accent-blue)"></i>
+                    <h2>Welcome Back</h2>
+                    <p>Login to save your watchlist, set alerts & track stocks</p>
+                </div>
+                <button class="btn-google-login" onclick="loginWithGoogle()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+                    Continue with Google
+                </button>
+                <div class="login-divider"><span>or login with phone</span></div>
+                <div class="phone-login-form">
+                    <div class="phone-input-group">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" id="phoneInput" placeholder="Enter mobile number" maxlength="10">
+                    </div>
+                    <div id="recaptcha-container"></div>
+                    <button class="btn-send-otp" id="sendOtpBtn" onclick="sendOTP()">Send OTP</button>
+                    <div class="otp-section hidden" id="otpSection">
+                        <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6">
+                        <button class="btn-verify-otp" onclick="verifyOTP()">Verify OTP</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Modal -->
+        <div id="alertModal" class="modal hidden">
+            <div class="modal-content alert-modal">
+                <button class="modal-close-btn" onclick="closeAlertModal()">&times;</button>
+                <h2><i class="fas fa-bell" style="color:var(--accent-yellow)"></i> Set Price Alert</h2>
+                <div class="alert-stock-info">
+                    <span id="alertStockName">--</span>
+                    <span id="alertStockPrice">--</span>
+                </div>
+                <div class="alert-form">
+                    <label>Notify me when price goes</label>
+                    <select id="alertCondition">
+                        <option value="above">Above (&uarr;)</option>
+                        <option value="below">Below (&darr;)</option>
+                    </select>
+                    <div class="alert-price-input">
+                        <span id="alertCurrencySymbol">&#8377;</span>
+                        <input type="number" id="alertTargetPrice" placeholder="Enter target price" step="0.01">
+                    </div>
+                    <button class="btn-create-alert" onclick="createAlert()">
+                        <i class="fas fa-bell"></i> Create Alert
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- World Market Ticker -->
+        <div class="ticker-bar">
+            <div class="ticker-content" id="tickerContent">
+                <span class="ticker-loading">Loading world markets...</span>
+            </div>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="welcome-screen">
+            <div class="welcome-content">
+                <div class="welcome-icon"><i class="fas fa-chart-line"></i></div>
+                <h1>StockDecision</h1>
+                <p>Real-time data. Proven indicators. Smarter decisions. Our AI engine analyzes 50+ technical & fundamental signals with over 90% data accuracy — so you invest with confidence, not guesswork.</p>
+                <!-- Stock of the Day -->
+                <div class="sotd-card hidden" id="sotdCard">
+                    <div class="sotd-badge"><i class="fas fa-star"></i> Stock of the Day</div>
+                    <div class="sotd-body">
+                        <div class="sotd-info">
+                            <h2 id="sotdName">Loading...</h2>
+                            <span class="sotd-sector" id="sotdSector">--</span>
+                        </div>
+                        <div class="sotd-price-row">
+                            <span class="sotd-price" id="sotdPrice">--</span>
+                            <span class="sotd-change" id="sotdChange">--</span>
+                        </div>
+                        <div class="sotd-verdict" id="sotdVerdict">--</div>
+                        <div class="sotd-metrics">
+                            <span id="sotdPE">P/E: --</span>
+                            <span id="sotdEPS">EPS: --</span>
+                            <span id="sotd52W">52W: --</span>
+                        </div>
+                        <button class="btn-sotd-analyze" onclick="analyzeSOTD()"><i class="fas fa-bolt"></i> Analyze Now</button>
+                    </div>
+                </div>
+
+                <div class="quick-picks">
+                    <h3><i class="fas fa-fire" style="color:var(--accent-yellow)"></i> Popular Indian Stocks:</h3>
+                    <div class="pick-grid">
+                        <button class="pick-btn indian" data-symbol="RELIANCE.NS">RELIANCE<span>Reliance Ind.</span></button>
+                        <button class="pick-btn indian" data-symbol="TCS.NS">TCS<span>TCS Ltd</span></button>
+                        <button class="pick-btn indian" data-symbol="HDFCBANK.NS">HDFC Bank<span>HDFC Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="INFY.NS">INFY<span>Infosys</span></button>
+                        <button class="pick-btn indian" data-symbol="ICICIBANK.NS">ICICI Bank<span>ICICI Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="SBIN.NS">SBI<span>State Bank</span></button>
+                        <button class="pick-btn indian" data-symbol="BHARTIARTL.NS">Airtel<span>Bharti Airtel</span></button>
+                        <button class="pick-btn indian" data-symbol="ITC.NS">ITC<span>ITC Ltd</span></button>
+                        <button class="pick-btn indian" data-symbol="TATAMOTORS.NS">Tata Motors<span>Tata Motors</span></button>
+                        <button class="pick-btn indian" data-symbol="BAJFINANCE.NS">Bajaj Fin<span>Bajaj Finance</span></button>
+                    </div>
+                    <h3 style="margin-top:16px"><i class="fas fa-globe" style="color:var(--accent-blue)"></i> US Stocks:</h3>
+                    <div class="pick-grid">
+                        <button class="pick-btn" data-symbol="AAPL">AAPL<span>Apple</span></button>
+                        <button class="pick-btn" data-symbol="MSFT">MSFT<span>Microsoft</span></button>
+                        <button class="pick-btn" data-symbol="GOOGL">GOOGL<span>Google</span></button>
+                        <button class="pick-btn" data-symbol="TSLA">TSLA<span>Tesla</span></button>
+                        <button class="pick-btn" data-symbol="NVDA">NVDA<span>NVIDIA</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <main id="dashboardContent" class="hidden">
+            <div class="dashboard-container">
+                <div class="dash-header">
+                    <h1><i class="fas fa-tachometer-alt"></i> My Dashboard</h1>
+                    <button class="btn-back-home" onclick="hideDashboard()"><i class="fas fa-arrow-left"></i> Back to Analyzer</button>
+                </div>
+                <div class="dash-grid-layout">
+                    <div class="dash-section">
+                        <h3><i class="fas fa-star" style="color:var(--accent-yellow)"></i> Watchlist</h3>
+                        <div id="watchlistGrid" class="dash-items"></div>
+                    </div>
+                    <div class="dash-section">
+                        <h3><i class="fas fa-bell" style="color:var(--accent-red)"></i> Active Alerts</h3>
+                        <div id="activeAlerts" class="dash-items"></div>
+                    </div>
+                    <div class="dash-section">
+                        <h3><i class="fas fa-clock" style="color:var(--accent-blue)"></i> Recent Searches</h3>
+                        <div id="recentSearches" class="dash-items"></div>
+                    </div>
+                    <div class="dash-section">
+                        <h3><i class="fas fa-fire" style="color:var(--accent-purple)"></i> Most Searched</h3>
+                        <div id="frequentStocks" class="dash-items"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Beginner Mode Content -->
+        <main id="beginnerContent" class="hidden">
+            <div class="beginner-container">
+                <!-- Switch to Pro Banner -->
+                <div class="mode-switch-banner" id="modeSwitchBanner">
+                    <div class="mode-switch-text">
+                        <i class="fas fa-microscope"></i>
+                        <div>
+                            <strong>Want deeper analysis?</strong>
+                            <span>View advanced charts, technical indicators, fundamentals & AI report</span>
+                        </div>
+                    </div>
+                    <button class="btn-switch-pro" onclick="switchMode('pro')">
+                        <i class="fas fa-arrow-right"></i> Switch to Pro View
+                    </button>
+                </div>
+                <!-- Big Verdict Card -->
+                <div class="b-verdict-card" id="bVerdictCard">
+                    <div class="b-verdict-emoji" id="bEmoji"></div>
+                    <h1 class="b-stock-name" id="bStockName">--</h1>
+                    <div class="b-price" id="bPrice">--</div>
+                    <div class="b-verdict-label" id="bVerdictLabel">--</div>
+                    <div class="b-verdict-desc" id="bVerdictDesc">--</div>
+                </div>
+
+                <!-- Simple Action Cards -->
+                <div class="b-cards-grid">
+                    <div class="b-card" id="bShouldBuy">
+                        <div class="b-card-icon"><i class="fas fa-shopping-cart"></i></div>
+                        <h3>Should I Buy?</h3>
+                        <p id="bBuyAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bHowLong">
+                        <div class="b-card-icon"><i class="fas fa-hourglass-half"></i></div>
+                        <h3>How Long to Hold?</h3>
+                        <p id="bHoldAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bHowMuch">
+                        <div class="b-card-icon"><i class="fas fa-wallet"></i></div>
+                        <h3>How Much to Invest?</h3>
+                        <p id="bInvestAnswer">--</p>
+                    </div>
+                    <div class="b-card" id="bDividend">
+                        <div class="b-card-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                        <h3>Will I Get Dividends?</h3>
+                        <p id="bDivAnswer">--</p>
+                    </div>
+                </div>
+
+                <!-- Health Meter -->
+                <div class="b-health-section">
+                    <h2><i class="fas fa-heartbeat"></i> Company Health Check</h2>
+                    <div class="b-health-grid" id="bHealthGrid"></div>
+                </div>
+
+                <!-- Simple Chart -->
+                <div class="b-chart-section">
+                    <h2><i class="fas fa-chart-line"></i> Price History (1 Year)</h2>
+                    <canvas id="bPriceChart"></canvas>
+                </div>
+
+                <!-- About the Company -->
+                <div class="b-about-section" id="bAbout">
+                    <h2><i class="fas fa-building"></i> About the Company</h2>
+                    <p id="bAboutText">--</p>
+                </div>
+
+                <!-- News & Events -->
+                <div class="b-news-section" id="bNewsSection">
+                    <h2><i class="fas fa-newspaper"></i> Latest News & Events</h2>
+                    <div class="b-news-verdict" id="bNewsVerdict"></div>
+                    <div class="b-news-grid" id="bNewsGrid"></div>
+                </div>
+
+                <!-- Simple Summary -->
+                <div class="b-summary-section" id="bSummary">
+                    <h2><i class="fas fa-lightbulb"></i> What Does This All Mean?</h2>
+                    <div class="b-summary-text" id="bSummaryText">--</div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Pro Mode Content -->
+        <main id="mainContent" class="hidden">
+            <div class="mode-switch-back">
+                <button onclick="switchMode('beginner')"><i class="fas fa-arrow-left"></i> Back to Simple View</button>
+            </div>
+            <!-- Top Summary Cards -->
+            <div class="summary-row">
+                <div class="summary-card verdict-card" id="verdictCard">
+                    <div class="verdict-badge" id="verdictBadge">ANALYZING</div>
+                    <h1 id="stockName">--</h1>
+                    <div class="price-display">
+                        <span class="current-price" id="currentPrice">--</span>
+                        <span class="price-change" id="priceChange">--</span>
+                    </div>
+                    <div class="verdict-text" id="verdictText">Enter a stock symbol to begin analysis</div>
+                </div>
+
+                <div class="summary-card">
+                    <h3><i class="fas fa-signal"></i> Signal Strength</h3>
+                    <div class="signal-meter">
+                        <div class="meter-bar">
+                            <div class="meter-fill" id="signalFill"></div>
+                        </div>
+                        <div class="meter-labels">
+                            <span>Strong Sell</span>
+                            <span>Neutral</span>
+                            <span>Strong Buy</span>
+                        </div>
+                    </div>
+                    <div class="signal-details" id="signalDetails">--</div>
+                </div>
+
+                <div class="summary-card">
+                    <h3><i class="fas fa-hand-holding-usd"></i> Investment Suggestion</h3>
+                    <div class="invest-suggestion" id="investSuggestion">
+                        <div class="invest-amount">--</div>
+                        <div class="invest-details">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3><i class="fas fa-chart-area"></i> Price Chart & Moving Averages</h3>
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fas fa-chart-bar"></i> Volume Analysis</h3>
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Analysis Grid -->
+            <div class="analysis-grid">
+                <div class="analysis-card">
+                    <h3><i class="fas fa-chart-pie"></i> Technical Analysis</h3>
+                    <div class="analysis-content" id="technicalAnalysis">
+                        <div class="indicator-grid" id="indicatorGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-balance-scale"></i> Fundamental Analysis</h3>
+                    <div class="analysis-content" id="fundamentalAnalysis">
+                        <div class="fundamental-grid" id="fundamentalGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-building"></i> Company Profile</h3>
+                    <div class="analysis-content" id="companyProfile">
+                        <p class="placeholder-text">Search a stock to view company details</p>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-coins"></i> Dividend & Returns</h3>
+                    <div class="analysis-content" id="dividendInfo">
+                        <p class="placeholder-text">Search a stock to view dividend info</p>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-globe"></i> World Market Overview</h3>
+                    <div class="analysis-content" id="worldMarket">
+                        <div class="market-grid" id="marketGrid"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <h3><i class="fas fa-clock"></i> Holding Period Recommendation</h3>
+                    <div class="analysis-content" id="holdDuration">
+                        <p class="placeholder-text">Search a stock to view holding recommendation</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News & Sentiment Analysis -->
+            <div class="news-card">
+                <h3><i class="fas fa-newspaper"></i> News & Events Sentiment</h3>
+                <div class="news-sentiment-bar" id="newsSentimentBar"></div>
+                <div class="news-grid-pro" id="newsGridPro"></div>
+            </div>
+
+            <!-- AI Detailed Report -->
+            <div class="report-card">
+                <h3><i class="fas fa-robot"></i> AI Analysis Report</h3>
+                <div class="report-content" id="aiReport">
+                    <p class="placeholder-text">Enter a stock symbol above to generate a comprehensive AI analysis report</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Stock Screener -->
+        <main id="screenerContent" class="hidden">
+            <div class="screener-container">
+                <div class="screener-header">
+                    <div class="screener-title">
+                        <h1><i class="fas fa-filter"></i> Stock Screener</h1>
+                        <p class="screener-subtitle">Filter and discover stocks using fundamental & technical metrics</p>
+                    </div>
+                    <button class="btn-back-home" onclick="hideScreener()"><i class="fas fa-arrow-left"></i> Back</button>
+                </div>
+
+                <div class="screener-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label><i class="fas fa-industry"></i> Sector</label>
+                            <select id="screenerSector"><option value="">All Sectors</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-chart-bar"></i> Max P/E Ratio</label>
+                            <input type="number" id="screenerPE" placeholder="e.g. 25" step="1">
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-percentage"></i> Min ROE (%)</label>
+                            <input type="number" id="screenerROE" placeholder="e.g. 15" step="1">
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label><i class="fas fa-coins"></i> Min Dividend (%)</label>
+                            <input type="number" id="screenerDiv" placeholder="e.g. 2" step="0.1">
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-building"></i> Market Cap</label>
+                            <select id="screenerMarketCap">
+                                <option value="">Any</option>
+                                <option value="large">Large Cap (₹20,000 Cr+)</option>
+                                <option value="mid">Mid Cap (₹5,000 - ₹20,000 Cr)</option>
+                                <option value="small">Small Cap (Below ₹5,000 Cr)</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-chart-line"></i> 1Y Performance</label>
+                            <select id="screenerChange">
+                                <option value="any">Any</option>
+                                <option value="positive">Positive only</option>
+                                <option value="negative">Negative only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button id="screenerRunBtn" class="btn-screen" onclick="runScreener()"><i class="fas fa-search"></i> Screen Stocks</button>
+                        <button class="btn-reset" onclick="resetScreener()"><i class="fas fa-redo"></i> Reset</button>
+                    </div>
+                </div>
+
+                <div class="screener-progress hidden" id="screenerProgress">
+                    <div class="progress-bar"><div class="progress-fill" id="screenerProgressFill"></div></div>
+                    <span id="screenerProgressText">Screening...</span>
+                </div>
+
+                <div class="screener-sort-bar">
+                    <span id="screenerCount"></span>
+                    <div class="sort-buttons">
+                        <span class="sort-label">Sort by</span>
+                        <button class="sort-btn active" onclick="sortScreener('score')">Score</button>
+                        <button class="sort-btn" onclick="sortScreener('pe')">P/E</button>
+                        <button class="sort-btn" onclick="sortScreener('roe')">ROE</button>
+                        <button class="sort-btn" onclick="sortScreener('div')">Dividend</button>
+                        <button class="sort-btn" onclick="sortScreener('change')">1Y Change</button>
+                    </div>
+                </div>
+                <div class="screener-results" id="screenerResults"></div>
+            </div>
+        </main>
+
+        <!-- IPO Analyzer Section -->
+        <main id="ipoContent" class="hidden">
+            <div class="ipo-container">
+                <div class="ipo-header">
+                    <div class="ipo-header-info">
+                        <h1><i class="fas fa-rocket"></i> IPO Analyzer</h1>
+                        <p class="ipo-subtitle">AI-powered analysis of upcoming, ongoing & recently listed IPOs</p>
+                    </div>
+                    <div class="ipo-header-actions">
+                        <button class="ipo-refresh-btn" onclick="refreshIPOData()" title="Refresh Data"><i class="fas fa-sync-alt"></i></button>
+                        <button class="btn-back-home" onclick="hideIPOSection()"><i class="fas fa-arrow-left"></i> Back</button>
+                    </div>
+                </div>
+
+                <!-- Tab Navigation -->
+                <div class="ipo-tabs">
+                    <button class="ipo-tab-btn active" data-tab="ongoing" onclick="switchIPOTab('ongoing')">
+                        <i class="fas fa-circle ipo-live-dot"></i> Ongoing
+                        <span class="ipo-tab-count" id="ipoOngoingCount">0</span>
+                    </button>
+                    <button class="ipo-tab-btn" data-tab="upcoming" onclick="switchIPOTab('upcoming')">
+                        <i class="fas fa-clock"></i> Upcoming
+                        <span class="ipo-tab-count" id="ipoUpcomingCount">0</span>
+                    </button>
+                    <button class="ipo-tab-btn" data-tab="listed" onclick="switchIPOTab('listed')">
+                        <i class="fas fa-check-circle"></i> Recently Listed
+                        <span class="ipo-tab-count" id="ipoListedCount">0</span>
+                    </button>
+                </div>
+
+                <!-- IPO List -->
+                <div class="ipo-list-container" id="ipoListContainer">
+                    <div class="ipo-loading">
+                        <div class="ipo-loading-spinner"></div>
+                        <p>Loading IPO data...</p>
+                    </div>
+                </div>
+
+                <!-- IPO Detail Panel (overlay) -->
+                <div class="ipo-detail-panel hidden" id="ipoDetailPanel"></div>
+            </div>
+        </main>
+
+        <!-- Chat Panel -->
+        <div class="chat-panel hidden" id="chatPanel">
+            <div class="chat-header">
+                <span><i class="fas fa-robot"></i> AI Stock Assistant</span>
+                <button id="chatCloseBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Ask about any stock..." autocomplete="off">
+                <button id="chatSendBtn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <!-- Mobile Bottom Bar -->
+        <div class="mobile-bottom-bar" id="mobileBottomBar">
+            <button class="mob-btn" onclick="goHome()">
+                <i class="fas fa-home"></i><span>Home</span>
+            </button>
+            <button class="mob-btn" onclick="showScreener()">
+                <i class="fas fa-filter"></i><span>Screener</span>
+            </button>
+            <button class="mob-btn" onclick="showIPOSection()">
+                <i class="fas fa-rocket"></i><span>IPO</span>
+            </button>
+            <button class="mob-btn" onclick="if(typeof getCurrentUser==='function'&&getCurrentUser())showDashboard();else if(typeof showLoginModal==='function')showLoginModal()">
+                <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p><i class="fas fa-exclamation-triangle"></i> Disclaimer: This tool provides analysis based on publicly available data. It is NOT financial advice. Always consult a certified financial advisor.</p>
+        </footer>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="app.js"></script>
+    <script src="auth.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="chat.js"></script>
+    <script src="screener.js"></script>
+    <script src="ipo.js"></script>
+</body>
+</html>
