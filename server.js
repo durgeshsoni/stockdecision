@@ -36,7 +36,7 @@ app.all('/api/alerts', alertsHandler);
 
 // ===== Serve Frontend =====
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => {
+app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
