@@ -71,9 +71,12 @@ function parseZerodhaTable(html, tableId, category) {
         const symbol       = getText(symbolMatch ? symbolMatch[1] : '');
         const companyName  = getText(nameMatch   ? nameMatch[1]   : '');
         const ipoType      = getText(typeMatch   ? typeMatch[1]   : 'Mainboard');
-        const ipoDateRange = getText(dateCells[0] || '').replace(/\d{4}-\d{2}-\d{2}\s*/, '').trim();
+        const ipoDateRange = getText((dateCells[0] || '').replace(/<span[^>]*class="hidden"[^>]*>[^<]*<\/span>/gi, '')).trim();
         const listingDate  = hiddenDate ? hiddenDate[1] : getText(dateCells[1] || '');
-        const priceBand    = getText(priceMatch  ? priceMatch[1]  : '').replace(/₹/g, '').replace(/–/g, '-').trim();
+        const priceRaw     = getText(priceMatch  ? priceMatch[1]  : '').replace(/₹/g, '').replace(/–/g, '-');
+        const priceBand    = (priceRaw.match(/[\d,.]+\s*-\s*[\d,.]+/) || [priceRaw.trim()])[0].trim();
+        const listingGainMatch = priceRaw.match(/Listing gain\s*([-\d.]+%)/i);
+        const listingGain  = listingGainMatch ? listingGainMatch[1] : '';
         const logoUrl      = imgMatch  ? imgMatch[1]  : '';
         const detailPath   = hrefMatch ? hrefMatch[1] : '';
 
@@ -81,7 +84,7 @@ function parseZerodhaTable(html, tableId, category) {
         const { openDate, closeDate } = parseDateRange(ipoDateRange);
 
         if (!companyName) return null;
-        return { symbol, companyName, ipoType, priceBand, openDate, closeDate, listingDate, ipoDateRange, logoUrl, detailPath, category, source: 'zerodha', gmp: '', ipoSize: '', lotSize: '' };
+        return { symbol, companyName, ipoType, priceBand, listingGain, openDate, closeDate, listingDate, ipoDateRange, logoUrl, detailPath, category, source: 'zerodha', gmp: '', ipoSize: '', lotSize: '' };
     }).filter(Boolean);
 }
 

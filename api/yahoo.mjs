@@ -201,7 +201,7 @@ export default async function yahooHandler(req, res) {
             fetches.push(yahooGet(`https://news.google.com/rss/search?q=${encodeURIComponent(cleanName + ' stock')}&hl=en-IN&gl=IN&ceid=IN:en`).then(r => parseGoogleNewsRSS(r.text)).catch(() => []));
             const marketQuery = isIndian ? 'Indian stock market Nifty Sensex today' : 'stock market today US';
             fetches.push(yahooGet(`https://news.google.com/rss/search?q=${encodeURIComponent(marketQuery)}&hl=en-IN&gl=IN&ceid=IN:en`).then(r => parseGoogleNewsRSS(r.text)).catch(() => []));
-            fetches.push(yahooGet(`https://news.google.com/rss/search?q=${encodeURIComponent('world economy trade war geopolitics market impact')}&hl=en&gl=US&ceid=US:en`).then(r => parseGoogleNewsRSS(r.text)).catch(() => []));
+            fetches.push(yahooGet(`https://news.google.com/rss/search?q=${encodeURIComponent('global stock market economy financial')}&hl=en-IN&gl=IN&ceid=IN:en`).then(r => parseGoogleNewsRSS(r.text)).catch(() => []));
 
             const [yahooNews, companyNews, marketNews, worldNews] = await Promise.all(fetches);
 

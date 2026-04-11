@@ -1,0 +1,74 @@
+functionsDirectory = "/Users/durgeshsoni/Desktop/Soni/stock-analyzer/netlify/functions"
+functionsDirectoryOrigin = "config-v1"
+redirectsOrigin = "config"
+plugins = []
+headers = []
+
+[build]
+publish = "/Users/durgeshsoni/Desktop/Soni/stock-analyzer/public"
+publishOrigin = "config"
+functions = "/Users/durgeshsoni/Desktop/Soni/stock-analyzer/netlify/functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions.check-alerts]
+schedule = "*/15 * * * *"
+
+[functions."*"]
+included_files = ["netlify/lib/**"]
+node_bundler = "esbuild"
+
+[[redirects]]
+from = "/api/chart"
+to = "/.netlify/functions/yahoo?type=chart"
+status = 200.0
+force = false
+
+[redirects.query]
+symbol = ":symbol"
+range = ":range"
+interval = ":interval"
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/fundamentals"
+to = "/.netlify/functions/yahoo?type=fundamentals"
+status = 200.0
+force = false
+
+[redirects.query]
+symbol = ":symbol"
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/insights"
+to = "/.netlify/functions/yahoo?type=insights"
+status = 200.0
+force = false
+
+[redirects.query]
+symbol = ":symbol"
+
+[redirects.conditions]
+
+[redirects.headers]

@@ -475,7 +475,7 @@ function runAnalysis(prices, summary, meta, insights) {
     const monthChange = closes.length >= 22 ? ((latest - closes[21]) / closes[21] * 100) : 0;
     const threeMonthChange = closes.length >= 66 ? ((latest - closes[65]) / closes[65] * 100) : 0;
     const sixMonthChange = closes.length >= 126 ? ((latest - closes[125]) / closes[125] * 100) : 0;
-    const yearChange = closes.length >= 250 ? ((latest - closes[249]) / closes[249] * 100) : 0;
+    const yearChange = closes.length >= 200 ? ((latest - closes[closes.length - 1]) / closes[closes.length - 1] * 100) : 0;
 
     // Fundamentals from scraped summary
     const fd = summary.financialData || {};
@@ -1068,7 +1068,7 @@ function renderNewsBeginnerMode(news, analysis) {
     el.innerHTML = verdictText;
 
     // News items
-    const allItems = [...(news.stock?.items||[]), ...(news.market?.items||[]).slice(0,3), ...(news.world?.items||[]).slice(0,2)];
+    const allItems = [...(news.stock?.items||[]).slice(0,5), ...(news.market?.items||[]).slice(0,3)];
     grid.innerHTML = allItems.slice(0, 8).map(item => `
         <div class="b-news-item">
             <div class="b-news-dot ${item.sentiment}"></div>
