@@ -30,6 +30,7 @@ async function authApiCall(func, action, body = null) {
 async function showDashboard() {
     const user = getCurrentUser();
     if (!user) { showLoginModal(); return; }
+    setRoute('/dashboard');
 
     // Hide other screens, show dashboard
     const welcome = document.getElementById('welcomeScreen');

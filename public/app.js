@@ -247,6 +247,7 @@ function trackSearch(symbol, name) {
 
 // ===== Go Home (Logo Click) =====
 function goHome() {
+    setRoute('/');
     // Hide all content sections
     ['dashboardContent', 'screenerContent', 'mainContent', 'beginnerContent', 'alertsContent', 'ipoContent'].forEach(id => {
         const el = document.getElementById(id);
@@ -440,6 +441,7 @@ async function startAnalysis() {
             document.getElementById('welcomeScreen').classList.add('hidden');
             document.getElementById('beginnerContent').classList.remove('hidden');
             document.getElementById('mainContent').classList.add('hidden');
+            setRoute('/stock/' + encodeURIComponent(symbol));
         }, 300);
 
     } catch (err) {

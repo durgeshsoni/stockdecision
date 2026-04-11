@@ -20,6 +20,7 @@ async function ipoApiGetLocal(type, params = {}) {
 
 // ===== Show IPO Section =====
 function showIPOSection() {
+    setRoute('/ipo');
     // Hide other sections
     const sections = ['welcomeScreen', 'mainContent', 'beginnerContent', 'screenerContent', 'dashboardContent'];
     sections.forEach(id => {

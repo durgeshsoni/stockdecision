@@ -5,6 +5,7 @@ let screenerRunning = false;
 
 // ===== Show/Hide Screener =====
 function showScreener() {
+    setRoute('/screener');
     ['welcomeScreen','beginnerContent','mainContent','dashboardContent','ipoContent'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
