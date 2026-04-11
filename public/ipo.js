@@ -146,9 +146,9 @@ function renderIPOCard(ipo, tab) {
     const priceBand = ipo.priceBand || '—';
 
     // Dates
-    const openDate = ipo.openDate || '—';
-    const closeDate = ipo.closeDate || '—';
-    const listingDate = ipo.listingDate || '—';
+    const openDate = formatIPODate(ipo.openDate) || '—';
+    const closeDate = formatIPODate(ipo.closeDate) || '—';
+    const listingDate = formatIPODate(ipo.listingDate) || '—';
 
     // IPO size
     const ipoSize = ipo.ipoSize || '—';
@@ -604,19 +604,19 @@ function renderDeepAnalysis(detail) {
         : totalSub > 0 ? 'Undersubscribed — below expectations. Proceed with caution.'
         : 'Subscription data not yet available.';
 
-    // Investment checklist
+    // Investment checklist — null means data not available (shows as unknown, not fail)
     const checks = [
-        { label: 'Company is profitable', pass: fin.patMargin > 0, note: fin.patMargin ? `PAT Margin: ${fin.patMargin}%` : 'Data unavailable' },
-        { label: 'Revenue is growing', pass: fin.revenueGrowth > 0, note: fin.revenueGrowth ? `Growth: ${fin.revenueGrowth}%` : 'Data unavailable' },
-        { label: 'Low debt levels', pass: fin.debtToEquity < 1, note: fin.debtToEquity ? `D/E: ${fin.debtToEquity}` : 'Data unavailable' },
-        { label: 'Reasonable valuation', pass: val.peRatio < 40, note: val.peRatio ? `P/E: ${val.peRatio}x` : 'Data unavailable' },
-        { label: 'GMP is positive', pass: gmpVal > 0, note: gmpVal > 0 ? `GMP: ₹${gmpVal}` : 'No GMP data' },
-        { label: 'Good market sentiment', pass: (detail.sentiment?.score || 50) >= 55, note: `Sentiment score: ${detail.sentiment?.score || 50}/100` },
-        { label: 'Subscribed above 1x', pass: totalSub >= 1, note: totalSub > 0 ? `${totalSub.toFixed(2)}x subscribed` : 'Not yet open' },
+        { label: 'Company is profitable',  pass: fin.patMargin != null ? fin.patMargin > 0 : null,      note: fin.patMargin != null ? `PAT Margin: ${fin.patMargin}%` : 'Not yet listed — financials unavailable' },
+        { label: 'Revenue is growing',     pass: fin.revenueGrowth != null ? fin.revenueGrowth > 0 : null, note: fin.revenueGrowth != null ? `Growth: ${fin.revenueGrowth}%` : 'Not yet listed — financials unavailable' },
+        { label: 'Low debt levels',        pass: fin.debtToEquity != null ? fin.debtToEquity < 1 : null,  note: fin.debtToEquity != null ? `D/E: ${fin.debtToEquity}` : 'Not yet listed — financials unavailable' },
+        { label: 'Reasonable valuation',   pass: val.peRatio != null ? val.peRatio < 40 : null,           note: val.peRatio != null ? `P/E: ${val.peRatio}x` : 'P/E not available for unlisted company' },
+        { label: 'GMP is positive',        pass: detail.gmp ? gmpVal > 0 : null,                          note: gmpVal > 0 ? `GMP: ₹${gmpVal} (~${gmpPct}% premium)` : detail.gmp ? 'Zero/negative GMP' : 'No GMP data yet' },
+        { label: 'Positive news sentiment',pass: (detail.sentiment?.score || 0) > 0 ? (detail.sentiment.score >= 55) : null, note: detail.sentiment?.score ? `Sentiment score: ${detail.sentiment.score}/100` : 'No news data' },
+        { label: 'Subscribed above 1x',   pass: totalSub > 0 ? totalSub >= 1 : null,                     note: totalSub > 0 ? `${totalSub.toFixed(2)}x subscribed` : 'Subscription not yet open' },
     ];
 
     const passCount = checks.filter(c => c.pass === true).length;
-    const totalChecks = checks.filter(c => c.pass !== undefined).length;
+    const totalChecks = checks.filter(c => c.pass !== null).length;
 
     return `
     <div class="ipo-deep-container">
@@ -633,7 +633,7 @@ function renderDeepAnalysis(detail) {
             <div class="ipo-deep-checklist">
                 ${checks.map(c => `
                     <div class="ipo-deep-check-item ${c.pass === true ? 'pass' : c.pass === false ? 'fail' : 'unknown'}">
-                        <i class="fas ${c.pass === true ? 'fa-check-circle' : c.pass === false ? 'fa-times-circle' : 'fa-question-circle'}"></i>
+                        <i class="fas ${c.pass === true ? 'fa-check-circle' : c.pass === null ? 'fa-question-circle' : 'fa-times-circle'}"></i>
                         <div class="ipo-deep-check-info">
                             <span class="ipo-deep-check-label">${c.label}</span>
                             <span class="ipo-deep-check-note">${c.note}</span>

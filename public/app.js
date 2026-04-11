@@ -1108,4 +1108,4 @@ function renderNewsProMode(news) {
 // ===== Utilities =====
 function showLoading(s){document.getElementById('loadingOverlay').classList.toggle('hidden',!s);}
 function updateProgress(t,p){document.getElementById('loadingStep').textContent=t;document.getElementById('progressFill').style.width=p+'%';}
-function showToast(m){document.querySelectorAll('.error-toast').forEach(e=>e.remove());const t=document.createElement('div');t.className='error-toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),5000);}
+function showToast(m,type='error'){document.querySelectorAll('.error-toast').forEach(e=>e.remove());const t=document.createElement('div');t.className='error-toast'+(type==='success'?' toast-success':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity 0.25s ease';setTimeout(()=>t.remove(),250);},4000);}
