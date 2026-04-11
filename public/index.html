@@ -19,16 +19,6 @@
                     <span>StockDecision</span>
                 </div>
             </div>
-            <div class="header-center">
-                <div class="search-container">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="stockInput" placeholder="Search any stock... (e.g. RELIANCE, TCS, INFY)" autocomplete="off" />
-                    <button id="analyzeBtn" class="btn-analyze">
-                        <i class="fas fa-bolt"></i> Analyze
-                    </button>
-                </div>
-                <div class="suggestions-dropdown hidden" id="suggestionsDropdown"></div>
-            </div>
             <div class="header-right">
                 <button class="btn-ai-chat" id="chatFab"><i class="fas fa-wand-magic-sparkles"></i> <span class="ai-chat-label">Analyze with AI</span></button>
                 <button class="btn-screener" onclick="showScreener()" title="Stock Screener"><i class="fas fa-filter"></i> <span class="screener-label">Screener</span></button>
@@ -133,6 +123,19 @@
                 <div class="welcome-icon"><i class="fas fa-chart-line"></i></div>
                 <h1>StockDecision</h1>
                 <p>Real-time data. Proven indicators. Smarter decisions. Our AI engine analyzes 50+ technical & fundamental signals with over 90% data accuracy — so you invest with confidence, not guesswork.</p>
+
+                <!-- Hero Search Bar -->
+                <div class="hero-search-wrapper">
+                    <div class="hero-search-container">
+                        <i class="fas fa-search hero-search-icon"></i>
+                        <input type="text" id="stockInput" placeholder="Search any stock... (e.g. RELIANCE, TCS, INFY)" autocomplete="off" />
+                        <button id="analyzeBtn" class="btn-analyze">
+                            <i class="fas fa-bolt"></i> Analyze
+                        </button>
+                    </div>
+                    <div class="suggestions-dropdown hidden" id="suggestionsDropdown"></div>
+                </div>
+
                 <!-- Stock of the Day -->
                 <div class="sotd-card hidden" id="sotdCard">
                     <div class="sotd-badge"><i class="fas fa-star"></i> Stock of the Day</div>

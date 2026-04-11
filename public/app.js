@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('stockInput').addEventListener('input', handleSearchInput);
     document.getElementById('stockInput').addEventListener('focus', handleSearchInput);
     document.addEventListener('click', e => {
-        if (!e.target.closest('.header-center'))
+        if (!e.target.closest('.hero-search-wrapper'))
             document.getElementById('suggestionsDropdown').classList.add('hidden');
     });
 
