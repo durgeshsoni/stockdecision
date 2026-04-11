@@ -1,12 +1,74 @@
 // ===== Yahoo Finance API Route =====
 // Handles: chart, fundamentals, insights, news, stockofday, screener
 
-async function yahooGet(url) {
-    const res = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-        redirect: 'follow',
+// --- In-memory response cache ---
+const cache = new Map(); // key → { value, expiresAt }
+
+function cacheGet(key) {
+    const entry = cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) { cache.delete(key); return null; }
+    return entry.value;
+}
+
+function cacheSet(key, value, ttlMs) {
+    cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+    // Evict stale entries if cache grows large
+    if (cache.size > 500) {
+        const now = Date.now();
+        for (const [k, v] of cache) { if (now > v.expiresAt) cache.delete(k); }
+    }
+}
+
+// --- Concurrency limiter (max 3 simultaneous Yahoo requests) ---
+let activeRequests = 0;
+const requestQueue = [];
+
+function runQueued(fn) {
+    return new Promise((resolve, reject) => {
+        requestQueue.push({ fn, resolve, reject });
+        drainQueue();
     });
-    return { status: res.status, text: await res.text() };
+}
+
+function drainQueue() {
+    if (activeRequests >= 3 || requestQueue.length === 0) return;
+    const { fn, resolve, reject } = requestQueue.shift();
+    activeRequests++;
+    fn().then(resolve, reject).finally(() => { activeRequests--; drainQueue(); });
+}
+
+// --- Fetch with retry + exponential backoff ---
+const USER_AGENTS = [
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+];
+let uaIndex = 0;
+
+async function yahooGet(url, retries = 2) {
+    return runQueued(async () => {
+        const urls = url.includes('query2') ? [url, url.replace('query2', 'query1')] : [url];
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            const tryUrl = urls[Math.min(attempt, urls.length - 1)];
+            const ua = USER_AGENTS[(uaIndex++) % USER_AGENTS.length];
+            try {
+                const res = await fetch(tryUrl, {
+                    headers: { 'User-Agent': ua, 'Accept': 'application/json,text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9' },
+                    redirect: 'follow',
+                    signal: AbortSignal.timeout(10000),
+                });
+                if (res.status === 429 && attempt < retries) {
+                    await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+                    continue;
+                }
+                return { status: res.status, text: await res.text() };
+            } catch (e) {
+                if (attempt === retries) throw e;
+                await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt)));
+            }
+        }
+    });
 }
 
 function extractQuoteSummary(html) {
@@ -64,37 +126,59 @@ function analyzeSentiment(newsItems) {
     return { items: analyzed, summary: { bullish: bullCount, bearish: bearCount, neutral: neutralCount, total: analyzed.length }, overallScore: Math.round(overallScore), overallSentiment };
 }
 
+// Validate symbol: only allow alphanumeric, dot, hyphen (e.g. RELIANCE.NS, BRK-B, AAPL)
+function sanitizeSymbol(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    const s = raw.trim().toUpperCase().slice(0, 20);
+    return /^[A-Z0-9.\-^]+$/.test(s) ? s : null;
+}
+
 export default async function yahooHandler(req, res) {
-    const { type, symbol } = req.query;
+    const { type } = req.query;
+    const symbol = sanitizeSymbol(req.query.symbol);
 
     if (!symbol && !['news', 'stockofday', 'screener'].includes(type)) {
         return res.status(400).json({ error: 'symbol required' });
+    }
+    if (req.query.symbol && !symbol) {
+        return res.status(400).json({ error: 'Invalid symbol format' });
     }
 
     try {
         // CHART
         if (type === 'chart') {
             const { range = '1y', interval = '1d' } = req.query;
-            let r = await yahooGet(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false`);
-            if (r.status === 429) r = await yahooGet(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false`);
+            const cacheKey = `chart:${symbol}:${range}:${interval}`;
+            const cached = cacheGet(cacheKey);
+            if (cached) { res.set('Cache-Control', 'public, max-age=300'); return res.status(200).send(cached); }
+            const r = await yahooGet(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false`);
             if (r.status === 429) return res.status(429).json({ error: 'Yahoo rate limit. Wait 1-2 min.' });
+            if (r.status === 200) cacheSet(cacheKey, r.text, 5 * 60 * 1000);
             res.set('Cache-Control', 'public, max-age=300');
-            return res.status(200).send(r.text);
+            return res.status(r.status).send(r.text);
         }
 
         // FUNDAMENTALS
         if (type === 'fundamentals') {
+            const cacheKey = `fundamentals:${symbol}`;
+            const cached = cacheGet(cacheKey);
+            if (cached) { res.set('Cache-Control', 'public, max-age=300'); return res.json(cached); }
             const r = await yahooGet(`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`);
             const summary = extractQuoteSummary(r.text);
+            if (summary) cacheSet(cacheKey, summary, 5 * 60 * 1000);
             res.set('Cache-Control', 'public, max-age=300');
             return res.json(summary || {});
         }
 
         // INSIGHTS
         if (type === 'insights') {
+            const cacheKey = `insights:${symbol}`;
+            const cached = cacheGet(cacheKey);
+            if (cached) { res.set('Cache-Control', 'public, max-age=600'); return res.status(200).send(cached); }
             const r = await yahooGet(`https://query2.finance.yahoo.com/ws/insights/v2/finance/insights?symbol=${encodeURIComponent(symbol)}`);
-            res.set('Cache-Control', 'public, max-age=300');
-            return res.status(200).send(r.text);
+            if (r.status === 200) cacheSet(cacheKey, r.text, 10 * 60 * 1000);
+            res.set('Cache-Control', 'public, max-age=600');
+            return res.status(r.status).send(r.text);
         }
 
         // NEWS
@@ -205,12 +289,23 @@ export default async function yahooHandler(req, res) {
         if (type === 'screener') {
             const symbolsParam = req.query.symbols;
             if (!symbolsParam) return res.status(400).json({ error: 'symbols parameter required' });
-            const symbolsList = symbolsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 10);
+            const symbolsList = symbolsParam.split(',').map(s => sanitizeSymbol(s)).filter(Boolean).slice(0, 10);
 
             const fetchPromises = symbolsList.map(async (sym) => {
+                const chartKey = `chart:${sym}:1y:1d`;
+                const fundKey = `fundamentals:${sym}`;
+                const cachedChart = cacheGet(chartKey);
+                const cachedFund = cacheGet(fundKey);
+
                 const [chartRes, fundRes] = await Promise.allSettled([
-                    yahooGet(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&includePrePost=false`).then(r => JSON.parse(r.text)),
-                    yahooGet(`https://finance.yahoo.com/quote/${encodeURIComponent(sym)}/`).then(r => extractQuoteSummary(r.text)),
+                    cachedChart
+                        ? Promise.resolve(JSON.parse(cachedChart))
+                        : yahooGet(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&includePrePost=false`)
+                            .then(r => { if (r.status === 200) cacheSet(chartKey, r.text, 5 * 60 * 1000); return JSON.parse(r.text); }),
+                    cachedFund
+                        ? Promise.resolve(cachedFund)
+                        : yahooGet(`https://finance.yahoo.com/quote/${encodeURIComponent(sym)}/`)
+                            .then(r => { const s = extractQuoteSummary(r.text); if (s) cacheSet(fundKey, s, 5 * 60 * 1000); return s; }),
                 ]);
                 return { symbol: sym, chart: chartRes.status === 'fulfilled' ? chartRes.value : null, summary: fundRes.status === 'fulfilled' ? fundRes.value : null };
             });

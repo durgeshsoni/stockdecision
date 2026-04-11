@@ -4,7 +4,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { Resend } from 'resend';
 
 import yahooHandler from './api/yahoo.mjs';
@@ -27,12 +27,44 @@ app.use((req, res, next) => {
     next();
 });
 
+// ===== In-memory Rate Limiter =====
+// Limits per IP: 60 requests/min for /api/yahoo, 30 requests/min for other /api/* routes
+const rateLimitWindows = new Map(); // ip:route → { count, resetAt }
+
+function rateLimit(maxRequests, windowMs) {
+    return (req, res, next) => {
+        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+        const key = `${ip}:${req.path}`;
+        const now = Date.now();
+        const entry = rateLimitWindows.get(key);
+        if (!entry || now > entry.resetAt) {
+            rateLimitWindows.set(key, { count: 1, resetAt: now + windowMs });
+            return next();
+        }
+        entry.count++;
+        if (entry.count > maxRequests) {
+            const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+            res.set('Retry-After', retryAfter);
+            return res.status(429).json({ error: `Too many requests. Retry after ${retryAfter}s.` });
+        }
+        next();
+    };
+}
+
+// Evict expired rate limit entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitWindows) {
+        if (now > entry.resetAt) rateLimitWindows.delete(key);
+    }
+}, 5 * 60 * 1000);
+
 // ===== API Routes =====
-app.all('/api/yahoo', yahooHandler);
-app.all('/api/ipo', ipoHandler);
-app.all('/api/auth', authHandler);
-app.all('/api/user', userHandler);
-app.all('/api/alerts', alertsHandler);
+app.all('/api/yahoo', rateLimit(60, 60 * 1000), yahooHandler);   // 60 req/min per IP
+app.all('/api/ipo', rateLimit(20, 60 * 1000), ipoHandler);        // 20 req/min per IP
+app.all('/api/auth', rateLimit(20, 60 * 1000), authHandler);      // 20 req/min per IP
+app.all('/api/user', rateLimit(30, 60 * 1000), userHandler);      // 30 req/min per IP
+app.all('/api/alerts', rateLimit(30, 60 * 1000), alertsHandler);  // 30 req/min per IP
 
 // ===== Serve Frontend =====
 app.use(express.static(path.join(__dirname, 'public')));
@@ -44,12 +76,21 @@ app.get('/{*path}', (req, res) => {
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
+let _alertClient = null;
+let _alertDb = null;
+
 async function getAlertDb() {
     const uri = process.env.MONGODB_URI;
     if (!uri) return null;
-    const client = new MongoClient(uri, { maxPoolSize: 1, serverSelectionTimeoutMS: 5000 });
+    if (_alertClient && _alertDb) {
+        // Ping to verify the connection is still alive
+        try { await _alertDb.command({ ping: 1 }); return _alertDb; } catch { _alertClient = null; _alertDb = null; }
+    }
+    const client = new MongoClient(uri, { maxPoolSize: 5, serverSelectionTimeoutMS: 5000 });
     await client.connect();
-    return { client, db: client.db(process.env.MONGODB_DB_NAME || 'stock_analyzer') };
+    _alertClient = client;
+    _alertDb = client.db(process.env.MONGODB_DB_NAME || 'stock_analyzer');
+    return _alertDb;
 }
 
 async function fetchStockPrice(symbol) {
@@ -88,12 +129,9 @@ function buildAlertEmail(alert, currentPrice) {
 
 async function checkAlerts() {
     if (!process.env.MONGODB_URI) return;
-    let client;
     try {
-        const conn = await getAlertDb();
-        if (!conn) return;
-        client = conn.client;
-        const db = conn.db;
+        const db = await getAlertDb();
+        if (!db) return;
 
         const activeAlerts = await db.collection('alerts').find({ status: 'active' }).toArray();
         if (activeAlerts.length === 0) return;
@@ -137,8 +175,9 @@ async function checkAlerts() {
         }
     } catch (err) {
         console.error('Alert check error:', err.message);
-    } finally {
-        if (client) { try { await client.close(); } catch { } }
+        // Reset cached connection on error so next run gets a fresh one
+        _alertClient = null;
+        _alertDb = null;
     }
 }
 

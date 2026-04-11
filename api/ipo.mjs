@@ -3,9 +3,40 @@ import { getDb } from '../lib/mongodb.mjs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// ===== Process-level L1 cache (faster than MongoDB, survives DB outages) =====
+const memCache = new Map(); // key → { data, cachedAt }
+
+function memCacheGet(key, ttlMs) {
+    const entry = memCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.cachedAt > ttlMs) { memCache.delete(key); return null; }
+    return entry.data;
+}
+
+function memCacheSet(key, data) {
+    memCache.set(key, { data, cachedAt: Date.now() });
+}
+
+// ===== Fetch helper with timeout + retry =====
+async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 10000) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const res = await fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+            if (!res.ok && attempt < retries) {
+                await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+                continue;
+            }
+            return res;
+        } catch (e) {
+            if (attempt === retries) throw e;
+            await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+        }
+    }
+}
+
 // ===== Zerodha IPO Scraper (Primary Source) =====
 async function fetchIPOFromZerodha() {
-    const r = await fetch('https://zerodha.com/ipo/', { headers: { 'User-Agent': UA } });
+    const r = await fetchWithRetry('https://zerodha.com/ipo/', { headers: { 'User-Agent': UA } });
     if (!r.ok) throw new Error('Zerodha fetch failed: ' + r.status);
     const html = await r.text();
 
@@ -77,9 +108,9 @@ function parseDateRange(rangeStr) {
 // ===== NSE Subscription Data =====
 async function fetchNSESubscription() {
     try {
-        const r = await fetch('https://www.nseindia.com/api/ipo-current-issue', {
+        const r = await fetchWithRetry('https://www.nseindia.com/api/ipo-current-issue', {
             headers: { 'User-Agent': UA, 'Accept': 'application/json', 'Referer': 'https://www.nseindia.com/' }
-        });
+        }, 1, 8000);
         if (!r.ok) return [];
         const data = await r.json();
         return Array.isArray(data) ? data : [];
@@ -90,7 +121,7 @@ async function fetchNSESubscription() {
 async function fetchIPONews(companyName) {
     const articles = [];
     try {
-        const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(companyName + ' IPO')}&hl=en-IN&gl=IN&ceid=IN:en`, { headers: { 'User-Agent': UA } });
+        const r = await fetchWithRetry(`https://news.google.com/rss/search?q=${encodeURIComponent(companyName + ' IPO')}&hl=en-IN&gl=IN&ceid=IN:en`, { headers: { 'User-Agent': UA } }, 1, 8000);
         if (r.ok) {
             const xml = await r.text();
             for (const item of (xml.match(/<item>([\s\S]*?)<\/item>/gi) || []).slice(0, 10)) {
@@ -131,12 +162,12 @@ function computeNewsSentiment(articles) {
 // ===== Yahoo Finance Enrichment =====
 async function fetchYahooData(companyName) {
     try {
-        const searchResp = await fetch(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(companyName + ' NSE')}&quotesCount=3&newsCount=0`, { headers: { 'User-Agent': UA } });
+        const searchResp = await fetchWithRetry(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(companyName + ' NSE')}&quotesCount=3&newsCount=0`, { headers: { 'User-Agent': UA } }, 1, 8000);
         if (!searchResp.ok) return null;
         const searchData = await searchResp.json();
         const quote = (searchData.quotes || []).find(q => q.exchange === 'NSI' || q.exchange === 'BSE' || q.exchange === 'NSE');
         if (!quote) return null;
-        const fundResp = await fetch(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${quote.symbol}?modules=summaryProfile,financialData,defaultKeyStatistics`, { headers: { 'User-Agent': UA } });
+        const fundResp = await fetchWithRetry(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${quote.symbol}?modules=summaryProfile,financialData,defaultKeyStatistics`, { headers: { 'User-Agent': UA } }, 1, 8000);
         if (!fundResp.ok) return null;
         const fundData = await fundResp.json();
         const result = fundData?.quoteSummary?.result?.[0];
@@ -281,15 +312,23 @@ export default async function ipoHandler(req, res) {
 }
 
 async function handleList(db, res) {
-    const cached = await getCached(db, 'ipo_list', 30 * 60 * 1000);
-    if (cached) return res.json(cached);
+    // L1: process memory cache (5 min TTL — fast, no DB round-trip)
+    const memHit = memCacheGet('ipo_list', 5 * 60 * 1000);
+    if (memHit) return res.json(memHit);
+
+    // L2: MongoDB cache (30 min TTL)
+    const dbCached = await getCached(db, 'ipo_list', 30 * 60 * 1000);
+    if (dbCached) { memCacheSet('ipo_list', dbCached); return res.json(dbCached); }
 
     let zerodha, nseData = [];
     try {
         [zerodha, nseData] = await Promise.all([fetchIPOFromZerodha(), fetchNSESubscription()]);
     } catch (e) {
         console.error('IPO fetch error:', e.message);
-        return res.json({ upcoming: [], ongoing: [], listed: [], lastUpdated: new Date().toISOString(), source: 'error', message: 'IPO data temporarily unavailable.' });
+        // Fallback: serve stale MongoDB cache (up to 2 hrs) rather than empty response
+        const stale = await getCached(db, 'ipo_list', 2 * 60 * 60 * 1000);
+        if (stale) return res.json({ ...stale, stale: true, message: 'Showing cached data — live source temporarily unavailable.' });
+        return res.json({ upcoming: [], ongoing: [], listed: [], lastUpdated: new Date().toISOString(), source: 'error', message: 'IPO data temporarily unavailable. Please try again in a few minutes.' });
     }
 
     // Enrich ongoing IPOs with NSE subscription data
@@ -316,6 +355,7 @@ async function handleList(db, res) {
         source: 'zerodha+nse'
     };
 
+    memCacheSet('ipo_list', result);
     await setCache(db, 'ipo_list', result);
     return res.json(result);
 }
@@ -348,6 +388,7 @@ async function handleDetail(db, companyName, res) {
 }
 
 async function handleRefresh(db, res) {
+    memCache.delete('ipo_list');
     if (db) await db.collection('ipo_cache').deleteOne({ _id: 'ipo_list' }).catch(() => {});
     return await handleList(db, res);
 }
